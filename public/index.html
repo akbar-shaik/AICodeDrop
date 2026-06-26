@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AICodeDrop by Akbar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .terminal-scroll::-webkit-scrollbar { width: 8px; }
+        .terminal-scroll::-webkit-scrollbar-track { background: #1a202c; }
+        .terminal-scroll::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+        .terminal-scroll::-webkit-scrollbar-thumb:hover { background: #718096; }
+        
+        .drop-zone { transition: all 0.2s ease-in-out; }
+        .drop-zone.active {
+            background-color: #ebf8ff;
+            border-color: #3182ce;
+            transform: scale(1.02);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+
+    <div class="bg-white p-6 rounded-xl shadow-lg max-w-4xl w-full">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">🤖 AICodeDrop by Akbar</h1>
+        <p class="text-gray-600 mb-6">Drag and drop your project folder here. All processing happens locally in your browser.</p>
+
+        <div id="dropZone" class="drop-zone border-4 border-dashed border-gray-300 rounded-xl p-12 mb-6 flex flex-col items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100">
+            <svg class="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <h2 class="text-2xl font-bold text-gray-700 mb-2">Drag & Drop your project folder here</h2>
+            <p class="text-gray-500 text-sm">Or click anywhere in this box to select a folder</p>
+            <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden">
+        </div>
+
+        <div class="bg-gray-900 rounded-lg shadow-inner overflow-hidden mb-6 flex flex-col h-64">
+            <div class="bg-gray-800 px-4 py-2 flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                <span class="text-gray-400 text-xs ml-2 font-mono">browser_engine ~ local_scan</span>
+            </div>
+            <div id="consoleOutput" class="p-4 text-green-400 font-mono text-sm terminal-scroll overflow-y-auto flex-1 whitespace-pre-wrap"><span class="text-gray-500">Awaiting folder drop...</span></div>
+        </div>
+
+        <div id="selectionArea" class="hidden flex-col">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Prefix Text (Start of file)</label>
+                    <textarea id="customStart" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm">Understand complete files/code and each and everything folder structure. Please review the codebase context below.</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Suffix Text (End of file)</label>
+                    <textarea id="customEnd" rows="4" placeholder="e.g., Based on the code above, please help me fix..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mb-2 mt-4">
+                <h3 class="font-bold text-gray-800">Select files to include:</h3>
+                <button id="toggleAllBtn" class="text-sm text-blue-600 hover:underline font-medium">Deselect All</button>
+            </div>
+            
+            <div id="fileList" class="bg-gray-50 border border-gray-200 rounded-md p-4 h-64 overflow-y-auto mb-6 space-y-1 terminal-scroll shadow-inner">
+                </div>
+
+            <button id="generateBtn" class="w-full py-4 bg-green-600 text-white rounded-md hover:bg-green-700 font-bold text-lg shadow-md transition-colors">
+                Generate Final Context File
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const allowedExtensions = ['.html', '.css', '.js', '.jsx', '.ts', '.tsx', '.sql', '.py', '.json', '.env', '.md', '.yml', '.yaml'];
+        const ignoreDirs = ['node_modules', '.git', '.next', 'dist', 'build', '__pycache__', 'venv', '.idea', '.vscode'];
+        const MAX_FILE_SIZE = 1048576 * 2; // 2MB limit
+
+        // Global State
+        let scannedFiles = new Map();
+        let folderName = "project";
+        let allSelected = true;
+
+        // DOM Elements
+        const dropZone = document.getElementById('dropZone');
+        const folderInput = document.getElementById('folderInput');
+        const consoleOutput = document.getElementById('consoleOutput');
+        const selectionArea = document.getElementById('selectionArea');
+        const fileList = document.getElementById('fileList');
+        const generateBtn = document.getElementById('generateBtn');
+        const toggleAllBtn = document.getElementById('toggleAllBtn');
+
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        async function logToConsole(text, style = 'text-green-400') {
+            const line = document.createElement('div');
+            line.className = style;
+            line.textContent = `> ${text}`;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight; 
+            await delay(5); 
+        }
+
+        // --- Helper functions ---
+        async function readEntriesPromise(directoryReader) {
+            try {
+                let entries = [];
+                let readEntries = await new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
+                while (readEntries.length > 0) {
+                    entries.push(...readEntries);
+                    readEntries = await new Promise((resolve, reject) => directoryReader.readEntries(resolve, reject));
+                }
+                return entries;
+            } catch (err) {
+                return [];
+            }
+        }
+
+        async function scanEntry(entry, currentPath = "") {
+            if (entry.isDirectory) {
+                if (ignoreDirs.includes(entry.name)) return; 
+                const dirReader = entry.createReader();
+                const entries = await readEntriesPromise(dirReader);
+                for (let i = 0; i < entries.length; i++) {
+                    await scanEntry(entries[i], currentPath + entry.name + "/");
+                }
+            } else if (entry.isFile) {
+                const ext = entry.name.substring(entry.name.lastIndexOf('.')).toLowerCase();
+                if (allowedExtensions.includes(ext) || entry.name === '.env') {
+                    const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+                    if (file.size <= MAX_FILE_SIZE) {
+                        const relativePath = currentPath + entry.name;
+                        scannedFiles.set(relativePath, file);
+                    } else {
+                        await logToConsole(`Skipped ${entry.name} (File > 2MB)`, 'text-yellow-500');
+                    }
+                }
+            }
+        }
+
+        async function finishScan() {
+            if (scannedFiles.size > 0) {
+                await logToConsole(`✅ Scan Complete. Found ${scannedFiles.size} valid files.`, 'text-blue-400');
+                
+                let index = 0;
+                for (const [path, file] of scannedFiles.entries()) {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center gap-2 hover:bg-gray-200 p-1 rounded';
+                    div.innerHTML = `
+                        <input type="checkbox" id="file-${index}" value="${path}" checked class="file-checkbox w-4 h-4 text-blue-600 rounded cursor-pointer">
+                        <label for="file-${index}" class="text-sm text-gray-700 font-mono cursor-pointer truncate w-full" title="${path}">${path}</label>
+                    `;
+                    fileList.appendChild(div);
+                    index++;
+                }
+                selectionArea.classList.remove('hidden');
+                selectionArea.classList.add('flex');
+            } else {
+                await logToConsole(`❌ No valid files found in folder.`, 'text-red-500');
+            }
+        }
+
+        function resetUI() {
+            selectionArea.classList.add('hidden');
+            consoleOutput.innerHTML = '';
+            fileList.innerHTML = '';
+            scannedFiles.clear();
+        }
+
+        // --- METHOD 1: DRAG AND DROP ---
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('active');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('active');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('active');
+            
+            const items = e.dataTransfer.items;
+            if (!items || items.length === 0) return;
+
+            // CRITICAL FIX: We MUST grab the rootEntry synchronously before any 'await' is called.
+            // Otherwise the browser destroys the e.dataTransfer security token!
+            const rootEntry = items[0].webkitGetAsEntry();
+            
+            if (!rootEntry) return alert("Your browser doesn't support folder dropping. Try clicking instead.");
+            if (!rootEntry.isDirectory) return alert("Please drop a folder, not individual files.");
+
+            resetUI();
+            
+            folderName = rootEntry.name;
+            await logToConsole(`Initializing local filesystem scan...`, 'text-yellow-400');
+            await logToConsole(`Scanning folder: ${folderName}`);
+            
+            await scanEntry(rootEntry, ""); 
+            await finishScan();
+        });
+
+        // --- METHOD 2: CLICK TO SELECT (FALLBACK) ---
+        dropZone.addEventListener('click', () => folderInput.click());
+
+        folderInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            resetUI();
+            
+            // Extract the root folder name from the first file's path
+            folderName = files[0].webkitRelativePath.split('/')[0] || "project";
+            
+            await logToConsole(`Initializing local filesystem scan...`, 'text-yellow-400');
+            await logToConsole(`Scanning folder: ${folderName}`);
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // Manually apply ignores for the click-to-select API
+                const pathParts = file.webkitRelativePath.split('/');
+                if (pathParts.some(part => ignoreDirs.includes(part))) continue;
+
+                const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                if (allowedExtensions.includes(ext) || file.name === '.env') {
+                    if (file.size <= MAX_FILE_SIZE) {
+                        // Strip the root folder name to match drag-and-drop output style
+                        const relativePath = file.webkitRelativePath.substring(file.webkitRelativePath.indexOf('/') + 1);
+                        scannedFiles.set(relativePath, file);
+                    } else {
+                        await logToConsole(`Skipped ${file.name} (File > 2MB)`, 'text-yellow-500');
+                    }
+                }
+            }
+            await finishScan();
+            // Reset input so the same folder can be clicked again if needed
+            folderInput.value = ''; 
+        });
+
+        // Toggle All
+        toggleAllBtn.addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.file-checkbox');
+            allSelected = !allSelected;
+            checkboxes.forEach(cb => cb.checked = allSelected);
+            toggleAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
+        });
+
+        // --- ASCII Tree Generator ---
+        function generateAsciiTree(paths) {
+            const root = {};
+            paths.forEach(path => {
+                const parts = path.split('/');
+                let current = root;
+                parts.forEach((part, i) => {
+                    if (!current[part]) current[part] = (i === parts.length - 1) ? null : {};
+                    current = current[part];
+                });
+            });
+
+            function drawTree(node, prefix = '') {
+                let result = '';
+                const keys = Object.keys(node);
+                keys.forEach((key, index) => {
+                    const isLast = index === keys.length - 1;
+                    const pointer = isLast ? '└── ' : '├── ';
+                    const isFolder = node[key] !== null;
+                    
+                    result += `${prefix}${pointer}${key}${isFolder ? '/' : ''}\n`;
+                    if (isFolder) result += drawTree(node[key], prefix + (isLast ? '    ' : '│   '));
+                });
+                return result;
+            }
+            return `${folderName}/\n${drawTree(root)}`;
+        }
+
+        // --- Generation Logic ---
+        generateBtn.addEventListener('click', async () => {
+            const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+            const selectedPaths = Array.from(checkboxes).map(cb => cb.value);
+            
+            const customStartText = document.getElementById('customStart').value;
+            const customEndText = document.getElementById('customEnd').value;
+
+            if (selectedPaths.length === 0) return alert('Please select at least one file.');
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Processing...';
+            consoleOutput.innerHTML = '';
+
+            await logToConsole(`Generating folder tree mapping...`, 'text-yellow-400');
+            
+            let outputContent = "";
+
+            if (customStartText) {
+                outputContent += `================================================================================\n`;
+                outputContent += `USER INSTRUCTIONS / CONTEXT:\n`;
+                outputContent += `================================================================================\n`;
+                outputContent += `${customStartText}\n\n`;
+            }
+
+            outputContent += `================================================================================\n`;
+            outputContent += `PROJECT FOLDER STRUCTURE:\n`;
+            outputContent += `================================================================================\n`;
+            outputContent += generateAsciiTree(selectedPaths);
+            outputContent += `\n\n--- Codebase Context Generated from folder: ${folderName} ---\n\n`;
+
+            for (let i = 0; i < selectedPaths.length; i++) {
+                const path = selectedPaths[i];
+                const file = scannedFiles.get(path);
+                
+                await logToConsole(`Reading memory: ${path}...`);
+                
+                try {
+                    const content = await file.text(); 
+                    outputContent += `\n\n================================================================================\n`;
+                    outputContent += `File: ${path}\n`;
+                    outputContent += `================================================================================\n\n`;
+                    outputContent += content;
+                } catch (err) {
+                    await logToConsole(`Error reading ${path}`, 'text-red-500');
+                }
+            }
+
+            if (customEndText) {
+                outputContent += `\n\n================================================================================\n`;
+                outputContent += `USER PROMPT / TASK:\n`;
+                outputContent += `================================================================================\n`;
+                outputContent += `${customEndText}\n`;
+            }
+
+            const blob = new Blob([outputContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${folderName}_context.txt`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            await logToConsole(`✅ Success! File generated locally and downloaded.`, 'text-blue-400 text-lg font-bold');
+            
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate Final Context File';
+        });
+    </script>
+</body>
+</html>
