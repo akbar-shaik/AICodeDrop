@@ -1,0 +1,148 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+const PORT = 3000;
+
+app.use(express.static('public'));
+app.use(express.json({ limit: '50mb' }));
+
+const allowedExtensions = [
+  '.html', '.css', '.js', '.jsx', '.ts', '.tsx', 
+  '.sql', '.py', '.json', '.env', '.md', '.yml', '.yaml'
+];
+const ignoreDirs = ['node_modules', '.git', '.next', 'dist', 'build', '__pycache__', 'venv'];
+
+// --- Helper: Generate ASCII Folder Tree ---
+function generateAsciiTree(folderName, filePaths) {
+    const root = {};
+    
+    // Build a nested object based on the paths
+    filePaths.forEach(filePath => {
+        const parts = filePath.split(/[/\\]/); // Split by \ (Windows) or / (Mac/Linux)
+        let current = root;
+        parts.forEach((part, i) => {
+            if (!current[part]) {
+                current[part] = (i === parts.length - 1) ? null : {};
+            }
+            current = current[part];
+        });
+    });
+
+    // Recursively draw the tree
+    function drawTree(node, prefix = '') {
+        let result = '';
+        const keys = Object.keys(node);
+        keys.forEach((key, index) => {
+            const isLast = index === keys.length - 1;
+            const pointer = isLast ? '└── ' : '├── ';
+            const isFolder = node[key] !== null;
+            
+            result += `${prefix}${pointer}${key}${isFolder ? '/' : ''}\n`;
+            
+            if (isFolder) {
+                const extension = isLast ? '    ' : '│   ';
+                result += drawTree(node[key], prefix + extension);
+            }
+        });
+        return result;
+    }
+
+    return `${folderName}/\n${drawTree(root)}`;
+}
+
+// --- ENDPOINT 1: Scan and list files ---
+app.post('/api/scan', (req, res) => {
+    const { folderPath } = req.body;
+    if (!folderPath) return res.status(400).json({ error: 'Folder path is required.' });
+
+    const targetDir = path.resolve(folderPath);
+    if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
+        return res.status(400).json({ error: 'Invalid directory path.' });
+    }
+
+    const filesFound = [];
+
+    function scanDir(currentDir) {
+        try {
+            const items = fs.readdirSync(currentDir, { withFileTypes: true });
+            for (const item of items) {
+                const fullPath = path.join(currentDir, item.name);
+                if (item.isDirectory()) {
+                    if (!ignoreDirs.includes(item.name)) scanDir(fullPath);
+                } else if (item.isFile()) {
+                    const ext = path.extname(item.name).toLowerCase();
+                    if (allowedExtensions.includes(ext) || item.name === '.env') {
+                        filesFound.push(path.relative(targetDir, fullPath));
+                    }
+                }
+            }
+        } catch (err) {
+            console.error(`Skipped ${currentDir}: ${err.message}`);
+        }
+    }
+
+    scanDir(targetDir);
+    res.json({ folderName: path.basename(targetDir), files: filesFound, basePath: targetDir });
+});
+
+// --- ENDPOINT 2: Generate the context file with Tree & Custom Text ---
+app.post('/api/generate', (req, res) => {
+    const { basePath, folderName, selectedFiles, customStartText, customEndText } = req.body;
+    
+    if (!basePath || !selectedFiles || !Array.isArray(selectedFiles)) {
+        return res.status(400).json({ error: 'Invalid data provided.' });
+    }
+
+    let outputContent = "";
+
+    // 1. Add Custom Start Text
+    if (customStartText && customStartText.trim() !== "") {
+        outputContent += `================================================================================\n`;
+        outputContent += `USER INSTRUCTIONS / CONTEXT:\n`;
+        outputContent += `================================================================================\n`;
+        outputContent += `${customStartText}\n\n`;
+    }
+
+    // 2. Add the Auto-Generated Folder Tree
+    outputContent += `================================================================================\n`;
+    outputContent += `PROJECT FOLDER STRUCTURE:\n`;
+    outputContent += `================================================================================\n`;
+    outputContent += generateAsciiTree(folderName, selectedFiles);
+    outputContent += `\n\n`;
+
+    outputContent += `--- Codebase Context Generated from folder: ${folderName} ---\n\n`;
+
+    // 3. Loop through selected files
+    for (const relativeFilePath of selectedFiles) {
+        const fullPath = path.join(basePath, relativeFilePath);
+        try {
+            if (fs.existsSync(fullPath)) {
+                const content = fs.readFileSync(fullPath, 'utf8');
+                outputContent += `\n\n================================================================================\n`;
+                outputContent += `File: ${relativeFilePath}\n`;
+                outputContent += `================================================================================\n\n`;
+                outputContent += content;
+            }
+        } catch (err) {
+            console.error(`Error reading ${fullPath}`);
+        }
+    }
+
+    // 4. Add Custom End Text
+    if (customEndText && customEndText.trim() !== "") {
+        outputContent += `\n\n================================================================================\n`;
+        outputContent += `USER PROMPT / TASK:\n`;
+        outputContent += `================================================================================\n`;
+        outputContent += `${customEndText}\n`;
+    }
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${folderName}_context.txt"`);
+    res.send(outputContent);
+});
+
+app.listen(PORT, () => {
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+});
