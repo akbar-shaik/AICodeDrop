@@ -5,7 +5,11 @@ const path = require('path');
 const app = express();
 const PORT = 3000;
 
-app.use(express.static('public'));
+// 1. Send the index.html file from the root directory
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 app.use(express.json({ limit: '50mb' }));
 
 const allowedExtensions = [
@@ -18,9 +22,8 @@ const ignoreDirs = ['node_modules', '.git', '.next', 'dist', 'build', '__pycache
 function generateAsciiTree(folderName, filePaths) {
     const root = {};
     
-    // Build a nested object based on the paths
     filePaths.forEach(filePath => {
-        const parts = filePath.split(/[/\\]/); // Split by \ (Windows) or / (Mac/Linux)
+        const parts = filePath.split(/[/\\]/); 
         let current = root;
         parts.forEach((part, i) => {
             if (!current[part]) {
@@ -30,7 +33,6 @@ function generateAsciiTree(folderName, filePaths) {
         });
     });
 
-    // Recursively draw the tree
     function drawTree(node, prefix = '') {
         let result = '';
         const keys = Object.keys(node);
@@ -97,7 +99,6 @@ app.post('/api/generate', (req, res) => {
 
     let outputContent = "";
 
-    // 1. Add Custom Start Text
     if (customStartText && customStartText.trim() !== "") {
         outputContent += `================================================================================\n`;
         outputContent += `USER INSTRUCTIONS / CONTEXT:\n`;
@@ -105,7 +106,6 @@ app.post('/api/generate', (req, res) => {
         outputContent += `${customStartText}\n\n`;
     }
 
-    // 2. Add the Auto-Generated Folder Tree
     outputContent += `================================================================================\n`;
     outputContent += `PROJECT FOLDER STRUCTURE:\n`;
     outputContent += `================================================================================\n`;
@@ -114,7 +114,6 @@ app.post('/api/generate', (req, res) => {
 
     outputContent += `--- Codebase Context Generated from folder: ${folderName} ---\n\n`;
 
-    // 3. Loop through selected files
     for (const relativeFilePath of selectedFiles) {
         const fullPath = path.join(basePath, relativeFilePath);
         try {
@@ -130,7 +129,6 @@ app.post('/api/generate', (req, res) => {
         }
     }
 
-    // 4. Add Custom End Text
     if (customEndText && customEndText.trim() !== "") {
         outputContent += `\n\n================================================================================\n`;
         outputContent += `USER PROMPT / TASK:\n`;
