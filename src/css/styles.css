@@ -1,0 +1,78 @@
+/* Custom terminal and application styles */
+
+/* Terminal Custom Scrollbar */
+.terminal-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.terminal-scroll::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Drop Zone Transitions */
+.drop-zone {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.drop-zone.active {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+  transform: scale(1.01);
+  box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.3);
+}
+
+/* Mode pill buttons */
+.mode-btn {
+  transition: all 0.15s ease-in-out;
+}
+
+.mode-btn.active-full {
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.mode-btn.active-compressed {
+  background-color: #059669;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.mode-btn.active-skeleton {
+  background-color: #7c3aed;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Progress bar transitions */
+.token-bar-fill {
+  transition: width 0.4s ease-out, background-color 0.4s ease-out;
+}
+
+/* Subtle code font styling */
+.font-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Toast animation */
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-enter {
+  animation: slideDownFade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
