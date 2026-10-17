@@ -1,32 +1,44 @@
 /**
- * worker.js - Dedicated Web Worker for Non-blocking Token Estimation
+ * worker.js - Dedicated Web Worker for Non-blocking o200k BPE Token Estimation
  */
 
 let gptTokenizer = null;
+let activeEncoding = 'heuristic';
 
-// Attempt dynamic import of gpt-tokenizer from CDN
+// Attempt dynamic import of o200k_base (modern GPT-4o / o1 / o3 tokenizer)
 async function initTokenizer() {
   if (gptTokenizer) return;
   try {
-    const module = await import('https://esm.sh/gpt-tokenizer@2.8.1');
-    if (module && typeof module.encode === 'function') {
-      gptTokenizer = module;
+    const mod = await import('https://esm.sh/gpt-tokenizer@2.8.1/encoding/o200k_base');
+    if (mod && typeof mod.encode === 'function') {
+      gptTokenizer = mod;
+      activeEncoding = 'o200k_base';
+      return;
     }
-  } catch (err) {
-    // Network offline or CDN blocked - fast heuristic will be used
-    gptTokenizer = null;
+  } catch (_) {
+    // Fallback to standard gpt-tokenizer (cl100k)
+    try {
+      const fallbackMod = await import('https://esm.sh/gpt-tokenizer@2.8.1');
+      if (fallbackMod && typeof fallbackMod.encode === 'function') {
+        gptTokenizer = fallbackMod;
+        activeEncoding = 'cl100k_base';
+        return;
+      }
+    } catch (_) {
+      gptTokenizer = null;
+      activeEncoding = 'heuristic';
+    }
   }
 }
 
-// Quick initiation
+// Initialize on load
 initTokenizer();
 
 /**
- * Fast accurate BPE estimation heuristic for code & text (cl100k approximation)
+ * Fast accurate BPE estimation heuristic for code & text (cl100k/o200k approximation)
  */
 function estimateTokensHeuristic(text) {
   if (!text) return 0;
-  // Splits words, symbols, whitespace blocks
   const tokens = text.match(/\w+|[^\w\s]|\s+/g);
   if (!tokens) return 0;
 
@@ -34,10 +46,8 @@ function estimateTokensHeuristic(text) {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
     if (/^\s+$/.test(t)) {
-      // Long indentations (every 4 spaces is ~1 token)
       count += Math.max(1, Math.ceil(t.length / 4));
     } else if (t.length > 8) {
-      // Long identifiers / words
       count += Math.ceil(t.length / 4);
     } else {
       count += 1;
@@ -63,22 +73,24 @@ self.onmessage = async (e) => {
 
   if (action === 'init') {
     await initTokenizer();
-    self.postMessage({ id, success: true, usingBPE: !!gptTokenizer });
+    self.postMessage({ id, success: true, usingBPE: !!gptTokenizer, encoding: activeEncoding });
     return;
   }
 
   if (action === 'count') {
     const tokens = countTokens(text);
-    self.postMessage({ id, tokens });
+    self.postMessage({ id, tokens, usingBPE: !!gptTokenizer, encoding: activeEncoding });
     return;
   }
 
   if (action === 'batch') {
     const results = {};
-    for (const key of Object.keys(items)) {
-      results[key] = countTokens(items[key]);
+    if (items) {
+      for (const key of Object.keys(items)) {
+        results[key] = countTokens(items[key]);
+      }
     }
-    self.postMessage({ id, results });
+    self.postMessage({ id, results, usingBPE: !!gptTokenizer, encoding: activeEncoding });
     return;
   }
 };

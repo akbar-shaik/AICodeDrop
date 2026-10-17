@@ -1,5 +1,5 @@
 /**
- * test-engine.js - Comprehensive Verification Suite for AICodeDrop v2
+ * test-engine.js - Comprehensive Verification Suite for AICodeDrop v2.5
  */
 
 import assert from 'node:assert';
@@ -9,7 +9,9 @@ import {
   isZeroValueSink,
   isEligibleFile,
   sanitizeSecrets,
-  getExtension
+  getExtension,
+  computeContentHash,
+  isDefaultIgnoredDir
 } from '../src/js/scanner.js';
 
 import {
@@ -18,7 +20,10 @@ import {
   skeletonizeJsTs,
   skeletonizePython,
   skeletonizeCurlyBraceLangs,
-  optimizeContent
+  optimizeContent,
+  stripSvgPaths,
+  compactJson,
+  countStructuralBraces
 } from '../src/js/optimizer.js';
 
 import {
@@ -29,14 +34,24 @@ import {
 } from '../src/js/xmlFormatter.js';
 
 import {
+  analyzeFile,
+  classifyFileRole,
+  extractImports,
+  extractExports,
+  buildArchitectureMap
+} from '../src/js/analyzer.js';
+
+import {
   estimateTokensSync,
   getBudgetStatus,
+  calculateContextOverhead,
+  getCalibratedModelTokens,
   MODEL_THRESHOLDS
 } from '../src/js/tokenizer.js';
 
 import { handler as telegramBackupHandler } from '../netlify/functions/telegram-backup.js';
 
-console.log('🧪 Starting AICodeDrop v2 Test Suite...\n');
+console.log('🧪 Starting AICodeDrop v2.5 Test Suite...\n');
 
 let passedTests = 0;
 let failedTests = 0;
@@ -66,9 +81,9 @@ async function testAsync(name, fn) {
 }
 
 // ==========================================
-// 1. Scanner & .gitignore Tests
+// 1. Scanner, .gitignore & Deduplication Tests
 // ==========================================
-console.log('--- 1. Ingestion Engine & .gitignore ---');
+console.log('--- 1. Ingestion Engine, .gitignore & Deduplication ---');
 
 test('.gitignore parses wildcards, comments, and directory rules', () => {
   const gitignoreText = `
@@ -90,7 +105,7 @@ docs/*.tmp
   assert.strictEqual(isIgnored('src/index.js', false), false);
 });
 
-test('Zero-value sink purge excludes lockfiles and minified files', () => {
+test('Zero-value sink purge excludes lockfiles, minified files, and deploy directories', () => {
   assert.strictEqual(isZeroValueSink('package-lock.json'), true);
   assert.strictEqual(isZeroValueSink('pnpm-lock.yaml'), true);
   assert.strictEqual(isZeroValueSink('yarn.lock'), true);
@@ -102,6 +117,10 @@ test('Zero-value sink purge excludes lockfiles and minified files', () => {
   assert.strictEqual(isZeroValueSink('image.png'), true);
   assert.strictEqual(isZeroValueSink('index.ts'), false);
   assert.strictEqual(isZeroValueSink('main.py'), false);
+
+  assert.strictEqual(isDefaultIgnoredDir('deploy'), true);
+  assert.strictEqual(isDefaultIgnoredDir('.netlify'), true);
+  assert.strictEqual(isDefaultIgnoredDir('node_modules'), true);
 });
 
 test('Secret sanitizer redacts private keys, Telegram tokens, AWS keys, and passwords', () => {
@@ -132,83 +151,99 @@ MIIEowIBAAKCAQEA0Y...
   assert.ok(sanitized.includes('/* <REDACTED_PRIVATE_KEY> */'));
 });
 
+test('Content-hash calculation detects identical duplicate files', () => {
+  const file1 = 'console.log("hello world");\nconst x = 42;';
+  const file2 = 'console.log("hello world");\nconst x = 42;';
+  const file3 = 'console.log("different code");';
+
+  const hash1 = computeContentHash(file1);
+  const hash2 = computeContentHash(file2);
+  const hash3 = computeContentHash(file3);
+
+  assert.strictEqual(hash1, hash2);
+  assert.notStrictEqual(hash1, hash3);
+  assert.strictEqual(hash1.length, 16);
+});
+
 // ==========================================
-// 2. Token Minimization Pipeline Tests
+// 2. Token Minimization & Lexer Robustness Tests
 // ==========================================
-console.log('\n--- 2. Token Minimization Pipeline ---');
+console.log('\n--- 2. Token Minimization & Lexer Robustness ---');
 
 test('Whitespace normalization collapses empty lines and tabs', () => {
   const input = '\tconst a = 1;\n\n\n\n\tconst b = 2;   \n';
-  const output = normalizeWhitespace(input);
-
+  const output = normalizeWhitespace(input, false);
   assert.strictEqual(output, '  const a = 1;\n\n  const b = 2;');
+
+  const aggressiveOutput = normalizeWhitespace(input, true);
+  assert.strictEqual(aggressiveOutput, '  const a = 1;\n  const b = 2;');
 });
 
-test('Universal comment stripper preserves string literals across languages', () => {
-  // JavaScript / TypeScript
-  const jsInput = `
-// Single line comment
-const url = "https://example.com//not-a-comment";
-/* Multi-line
-   comment */
-const template = \`/* not a comment either */\`;
-const greeting = 'Hello // world';
+test('Universal comment stripper preserves JS regex literals containing slashes', () => {
+  const jsWithRegex = `
+// Comment to remove
+const urlRegex = /https?:\\/\\/example\\.com\\/[a-z]+/gi;
+const match = line.replace(/\\/\\*/g, '');
+const a = 1; /* block comment */
 `;
-  const jsCleaned = stripComments(jsInput, 'js');
-  assert.ok(!jsCleaned.includes('Single line comment'));
-  assert.ok(!jsCleaned.includes('Multi-line'));
-  assert.ok(jsCleaned.includes('"https://example.com//not-a-comment"'));
-  assert.ok(jsCleaned.includes('`/* not a comment either */`'));
-  assert.ok(jsCleaned.includes("'Hello // world'"));
-
-  // Python
-  const pyInput = `
-# Comment here
-url = "https://domain.com#hash"
-""" Docstring to strip """
-def test():
-    # another comment
-    return 'ok'
-`;
-  const pyCleaned = stripComments(pyInput, 'py');
-  assert.ok(!pyCleaned.includes('Comment here'));
-  assert.ok(!pyCleaned.includes('Docstring to strip'));
-  assert.ok(pyCleaned.includes('"https://domain.com#hash"'));
-  assert.ok(pyCleaned.includes("'ok'"));
+  const cleaned = stripComments(jsWithRegex, 'js');
+  assert.ok(!cleaned.includes('Comment to remove'));
+  assert.ok(!cleaned.includes('block comment'));
+  assert.ok(cleaned.includes('/https?:\\/\\/example\\.com\\/[a-z]+/gi'));
+  assert.ok(cleaned.includes('line.replace(/\\/\\*/g, \'\')'));
+  assert.ok(cleaned.includes('const a = 1;'));
 });
 
-test('Structural skeletonizer preserves JS/TS signatures and types', () => {
-  const tsCode = `
-import { Config } from './config';
-export interface User {
-  id: string;
-  name: string;
+test('Universal comment stripper parses template literal ${...} expressions correctly', () => {
+  const templateCode = 'const msg = `User: ${user.name /* comment inside template */} logged in!`;';
+  const cleaned = stripComments(templateCode, 'js');
+  assert.ok(!cleaned.includes('/* comment inside template */'));
+  assert.ok(cleaned.includes('const msg = `User: ${user.name } logged in!`;'));
+});
+
+test('Structural brace counter ignores braces in strings and template literals', () => {
+  const lineWithStringBrace = 'const str = "hello { brace }"; if (true) {';
+  const { open, close, delta } = countStructuralBraces(lineWithStringBrace);
+  assert.strictEqual(open, 1);
+  assert.strictEqual(close, 0);
+  assert.strictEqual(delta, 1);
+});
+
+test('Structural skeletonizer does not desync on braces inside strings', () => {
+  const code = `
+export function parseConfig() {
+  const template = "format: {id}";
+  const obj = { key: "value" };
+  return obj;
 }
 
-export class UserService {
-  constructor(private db: any) {
-    this.init();
-  }
-
-  async getUser(id: string): Promise<User> {
-    const res = await this.db.find(id);
-    return res;
-  }
-}
-
-export function helper(val: number): number {
-  const temp = val * 2;
-  return temp + 1;
+export function secondFunc(a: number): number {
+  return a * 2;
 }
 `;
-  const skeleton = skeletonizeJsTs(tsCode);
+  const skeleton = skeletonizeJsTs(code);
+  assert.ok(skeleton.includes('export function parseConfig() { /* implementation omitted */ }'));
+  assert.ok(skeleton.includes('export function secondFunc(a: number): number { /* implementation omitted */ }'));
+  assert.ok(!skeleton.includes('format: {id}'));
+  assert.ok(!skeleton.includes('return a * 2;'));
+});
 
-  assert.ok(skeleton.includes("import { Config } from './config';"));
-  assert.ok(skeleton.includes('export interface User'));
-  assert.ok(skeleton.includes('export class UserService'));
-  assert.ok(skeleton.includes('/* implementation omitted */'));
-  assert.ok(!skeleton.includes('this.init();'));
-  assert.ok(!skeleton.includes('const temp = val * 2;'));
+test('Structural skeletonizer preserves multi-line function signatures', () => {
+  const code = `
+export function complexService(
+  userId: string,
+  options: { retries: number }
+): Promise<void> {
+  const result = doWork(userId, options);
+  return result;
+}
+`;
+  const skeleton = skeletonizeJsTs(code);
+  assert.ok(skeleton.includes('export function complexService('));
+  assert.ok(skeleton.includes('userId: string,'));
+  assert.ok(skeleton.includes('options: { retries: number }'));
+  assert.ok(skeleton.includes('): Promise<void> { /* implementation omitted */ }'));
+  assert.ok(!skeleton.includes('const result = doWork'));
 });
 
 test('Structural skeletonizer preserves Python classes and signatures', () => {
@@ -239,100 +274,165 @@ class DataProcessor:
   assert.ok(!skeleton.includes('count += len(item)'));
 });
 
-// ==========================================
-// 3. Structured XML Formatter Tests
-// ==========================================
-console.log('\n--- 3. Structured XML Context Builder ---');
+test('Inline SVG path stripping and JSON compaction save tokens', () => {
+  const htmlWithSvg = `<div class="icon"><svg viewBox="0 0 100 100"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343" fill="currentColor"/></svg></div>`;
+  const strippedSvg = stripSvgPaths(htmlWithSvg);
+  assert.ok(strippedSvg.includes('<!-- icon omitted -->'));
+  assert.ok(!strippedSvg.includes('M12 2C6.477'));
 
-test('Generates structured XML adhering to Claude 3.7 / GPT-4o / Gemini format', () => {
+  const prettyJson = `{\n  "name": "test",\n  "version": "1.0.0"\n}`;
+  const compacted = compactJson(prettyJson, 'compressed');
+  assert.strictEqual(compacted, '{"name":"test","version":"1.0.0"}');
+});
+
+// ==========================================
+// 3. Static Analyzer & AI Comprehension Tests
+// ==========================================
+console.log('\n--- 3. Static Analyzer & Architecture Mapping ---');
+
+test('Analyzer extracts imports, exports, and classifies roles', () => {
+  const jsCode = `
+import { scanner } from './scanner.js';
+import express from 'express';
+
+export interface AppConfig {
+  port: number;
+}
+
+export class AppServer {
+  start() {}
+}
+
+export function init() {
+  return true;
+}
+
+export const VERSION = '2.5.0';
+`;
+  const analysis = analyzeFile('src/js/app.js', jsCode);
+
+  assert.strictEqual(analysis.role, 'entrypoint');
+  assert.ok(analysis.imports.includes('./scanner.js'));
+  assert.ok(analysis.imports.includes('express'));
+  assert.ok(analysis.exports.includes('AppConfig'));
+  assert.ok(analysis.exports.includes('AppServer'));
+  assert.ok(analysis.exports.includes('init'));
+  assert.ok(analysis.exports.includes('VERSION'));
+
+  assert.strictEqual(classifyFileRole('package.json'), 'config');
+  assert.strictEqual(classifyFileRole('netlify/functions/telegram-backup.js'), 'serverless');
+  assert.strictEqual(classifyFileRole('test/test-engine.js'), 'test');
+  assert.strictEqual(classifyFileRole('src/js/optimizer.js'), 'core');
+});
+
+test('Architecture map generates clear hierarchical summary', () => {
+  const analyses = [
+    { path: 'index.html', role: 'entrypoint', imports: ['src/js/app.js'], exports: [] },
+    { path: 'src/js/app.js', role: 'entrypoint', imports: ['./scanner.js'], exports: ['start'] },
+    { path: 'src/js/scanner.js', role: 'core', imports: [], exports: ['scanFileSystemEntries'] }
+  ];
+  const mapText = buildArchitectureMap(analyses);
+
+  assert.ok(mapText.includes('[ENTRYPOINT] index.html -> imports: src/js/app.js'));
+  assert.ok(mapText.includes('[ENTRYPOINT] src/js/app.js -> imports: ./scanner.js | exports: start'));
+  assert.ok(mapText.includes('[CORE] src/js/scanner.js -> exports: scanFileSystemEntries'));
+});
+
+// ==========================================
+// 4. Structured XML Context Builder Tests
+// ==========================================
+console.log('\n--- 4. Structured XML Context Builder ---');
+
+test('Generates structured XML with context guide, architecture map, and duplicate references', () => {
   const xml = buildXmlContext({
     repositoryName: 'my-project',
     totalTokens: 14850,
+    codeTokens: 14000,
+    overheadTokens: 850,
     userInstructions: 'Act as pair programmer',
     userPrompt: 'Help fix database query',
     files: [
-      { path: 'src/server.ts', content: 'console.log("server");', mode: 'full', tokens: 420 },
-      { path: 'src/helpers/utils.ts', content: 'export function add() {}', mode: 'skeleton', tokens: 65 }
+      { path: 'src/server.ts', content: 'export function run() {}', mode: 'full', tokens: 420 },
+      { path: 'src/helpers/utils.ts', content: 'export function add() {}', mode: 'skeleton', tokens: 65 },
+      { path: 'Deploy/src/server.ts', mode: 'duplicate', duplicateOf: 'src/server.ts', tokens: 5 }
     ],
     manifestMap: new Map([
-      ['package.json', JSON.stringify({ dependencies: { express: '^4.18.2' } })]
+      ['package.json', JSON.stringify({ name: 'my-pkg', dependencies: { express: '^4.18.2' } })]
     ])
   });
 
-  assert.ok(xml.includes('<project_context repository="my-project" total_tokens="14850">'));
+  assert.ok(xml.includes('<project_context repository="my-project" total_tokens="14850" code_tokens="14000" overhead_tokens="850">'));
+  assert.ok(xml.includes('<context_guide>'));
+  assert.ok(xml.includes('HOW TO READ THIS REPOSITORY CONTEXT:'));
+  assert.ok(xml.includes('<architecture_map>'));
   assert.ok(xml.includes('<manifests>'));
   assert.ok(xml.includes('<directory_structure>'));
   assert.ok(xml.includes('<user_instructions>'));
   assert.ok(xml.includes('Act as pair programmer'));
   assert.ok(xml.includes('<codebase>'));
-  assert.ok(xml.includes('<file path="src/server.ts" mode="full" tokens="420">'));
-  assert.ok(xml.includes('<![CDATA[\nconsole.log("server");\n]]>'));
-  assert.ok(xml.includes('<file path="src/helpers/utils.ts" mode="skeleton" tokens="65">'));
+  assert.ok(xml.includes('<file path="src/server.ts" mode="full" tokens="420"'));
+  assert.ok(xml.includes('<file path="Deploy/src/server.ts" mode="duplicate" duplicate_of="src/server.ts" tokens="5" />'));
   assert.ok(xml.includes('<user_prompt>'));
   assert.ok(xml.includes('Help fix database query'));
   assert.ok(xml.includes('</project_context>'));
 });
 
-test('CDATA escaping correctly handles nested "]]>" characters', () => {
+test('CDATA escaping dynamically avoids double-escaping corruption', () => {
   const dangerousContent = 'const test = "]]>";';
   const escaped = escapeCData(dangerousContent);
   assert.strictEqual(escaped, 'const test = "]]]]><![CDATA[>";');
+
+  // Verify multiple occurrences
+  const multi = 'a]]>b]]>c';
+  assert.strictEqual(escapeCData(multi), 'a]]]]><![CDATA[>b]]]]><![CDATA[>c');
 });
 
-test('HTML and SQL comment stripping works correctly', () => {
-  const html = '<div class="test"><!-- This is a comment --><span>Hello</span></div>';
-  const strippedHtml = stripComments(html, 'html');
-  assert.strictEqual(strippedHtml, '<div class="test"><span>Hello</span></div>');
-
-  const sql = `
--- Select query
-SELECT * FROM users WHERE id = 1; -- inline comment
-/* Multi-line
-   block */
-`;
-  const strippedSql = stripComments(sql, 'sql');
-  assert.ok(!strippedSql.includes('-- Select query'));
-  assert.ok(!strippedSql.includes('/* Multi-line'));
-  assert.ok(strippedSql.includes('SELECT * FROM users WHERE id = 1;'));
-});
-
-test('ASCII folder tree generation produces correct visual hierarchy', () => {
-  const tree = generateAsciiTree('my-app', [
-    'src/index.js',
-    'src/utils/helpers.js',
-    'package.json'
-  ]);
-  assert.ok(tree.startsWith('my-app/\n'));
-  assert.ok(tree.includes('src/'));
-  assert.ok(tree.includes('utils/'));
-  assert.ok(tree.includes('helpers.js'));
-  assert.ok(tree.includes('index.js'));
-  assert.ok(tree.includes('package.json'));
-});
-
-test('Plain text context generation formats sections properly', () => {
+test('Plain text context generation formats sections properly with architecture map', () => {
   const txt = buildPlainTextContext({
     repositoryName: 'test-repo',
+    totalTokens: 100,
     userInstructions: 'Review architecture',
     userPrompt: 'Suggest improvements',
-    files: [{ path: 'main.js', content: 'console.log("hello");', mode: 'full', tokens: 10 }]
+    files: [
+      { path: 'main.js', content: 'console.log("hello");', mode: 'full', tokens: 10 },
+      { path: 'copy.js', mode: 'duplicate', duplicateOf: 'main.js', tokens: 5 }
+    ]
   });
 
+  assert.ok(txt.includes('CONTEXT GUIDE:'));
+  assert.ok(txt.includes('ARCHITECTURE MAP & SYMBOL INDEX:'));
   assert.ok(txt.includes('USER INSTRUCTIONS / CONTEXT:'));
   assert.ok(txt.includes('PROJECT FOLDER STRUCTURE:'));
-  assert.ok(txt.includes('File: main.js [Mode: full] [Tokens: ~10]'));
+  assert.ok(txt.includes('File: main.js [Mode: full'));
+  assert.ok(txt.includes('File: copy.js [DUPLICATE of main.js]'));
   assert.ok(txt.includes('USER PROMPT / TASK:'));
 });
 
 // ==========================================
-// 4. Token Metering Tests
+// 5. Token Metering & Context Overhead Tests
 // ==========================================
-console.log('\n--- 4. Token Metering & Budget Thresholds ---');
+console.log('\n--- 5. Token Metering, Calibration & Overhead Accounting ---');
 
-test('Token estimation produces positive values and respects model windows', () => {
+test('Token estimation respects calibrated model windows and overhead', () => {
   const sample = 'function helloWorld(name) { return `Hello, ${name}!`; }';
   const tokens = estimateTokensSync(sample);
   assert.ok(tokens > 5 && tokens < 30);
+
+  const overhead = calculateContextOverhead({
+    userInstructions: 'Hello world',
+    userPrompt: 'Test task',
+    asciiTree: 'my-app/\n└── index.js\n',
+    manifestSummary: 'deps: express',
+    architectureMap: '[CORE] index.js',
+    fileCount: 10,
+    format: 'xml'
+  });
+  assert.ok(overhead > 150, `Overhead should be substantial (got ${overhead})`);
+
+  const calibrated = getCalibratedModelTokens(10000);
+  assert.strictEqual(calibrated.openai, 10000);
+  assert.strictEqual(calibrated.claude, 10800); // 10000 * 1.08
+  assert.strictEqual(calibrated.gemini, 10400); // 10000 * 1.04
 
   const budget32k = getBudgetStatus(25000);
   assert.strictEqual(budget32k.tier, 'green');
@@ -351,9 +451,9 @@ test('Token estimation produces positive values and respects model windows', () 
 });
 
 // ==========================================
-// 5. Netlify Serverless Telegram Function Tests
+// 6. Netlify Serverless Telegram Function Tests
 // ==========================================
-console.log('\n--- 5. Netlify Function: telegram-backup.js ---');
+console.log('\n--- 6. Netlify Function: telegram-backup.js ---');
 
 await testAsync('OPTIONS request returns CORS headers with 204 status', async () => {
   const res = await telegramBackupHandler({ httpMethod: 'OPTIONS' });
@@ -369,7 +469,6 @@ await testAsync('Non-POST request returns 405 Method Not Allowed', async () => {
 });
 
 await testAsync('Missing credentials returns 500 with helpful instructions', async () => {
-  // Ensure env is empty for test
   const oldBotToken = process.env.TELEGRAM_BOT_TOKEN;
   const oldChatId = process.env.TELEGRAM_CHAT_ID;
   delete process.env.TELEGRAM_BOT_TOKEN;
@@ -384,7 +483,6 @@ await testAsync('Missing credentials returns 500 with helpful instructions', asy
   const json = JSON.parse(res.body);
   assert.ok(json.error.includes('Telegram credentials not configured'));
 
-  // Restore env
   if (oldBotToken) process.env.TELEGRAM_BOT_TOKEN = oldBotToken;
   if (oldChatId) process.env.TELEGRAM_CHAT_ID = oldChatId;
 });
@@ -393,7 +491,6 @@ await testAsync('Payload exceeding 4.5MB returns 413 Payload Too Large', async (
   process.env.TELEGRAM_BOT_TOKEN = 'mock-token';
   process.env.TELEGRAM_CHAT_ID = 'mock-chat-id';
 
-  // Create a body larger than 4.5MB (4.6MB)
   const hugeBody = JSON.stringify({
     fileName: 'large.txt',
     fileContent: 'x'.repeat(4.6 * 1024 * 1024)

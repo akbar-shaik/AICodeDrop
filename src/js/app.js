@@ -1,19 +1,22 @@
 /**
- * app.js - Main Application Orchestrator
+ * app.js - Main Application Orchestrator (v2.5)
  * 
  * Coordinates:
- * - Scanning & .gitignore filtering
- * - Optimization pipeline (Full, Compressed, Skeleton)
+ * - Scanning, nested .gitignore & zero-value sink purge
+ * - Fast content-hash file deduplication (detects mirror/build duplicates like Deploy/)
+ * - Optimization pipeline (Full, Compressed, Skeleton, Duplicate)
  * - Secret sanitization
- * - Live token counting & context budget feedback
- * - XML / Plain-text assembly & instant local download
- * - Telegram backup relay via Netlify Function
+ * - Non-blocking Web Worker token counting (o200k_base BPE)
+ * - Full context overhead accounting (prompts, tree, manifests, XML tags)
+ * - Structured XML (with <context_guide> & <architecture_map>) / Plain-text assembly
+ * - Instant local Blob download & Netlify Serverless Telegram relay
  */
 
 import {
   scanFileSystemEntries,
   scanFileList,
   sanitizeSecrets,
+  computeContentHash,
   MANIFEST_FILENAMES,
   getExtension
 } from './scanner.js';
@@ -25,15 +28,24 @@ import {
 import {
   initTokenizer,
   estimateTokensSync,
-  countTokensAsync,
+  batchCountTokensAsync,
+  calculateContextOverhead,
   getBudgetStatus,
+  getTokenizerStatus,
   MODEL_THRESHOLDS
 } from './tokenizer.js';
 
 import {
   buildXmlContext,
-  buildPlainTextContext
+  buildPlainTextContext,
+  generateAsciiTree,
+  extractManifestSummary
 } from './xmlFormatter.js';
+
+import {
+  analyzeFile,
+  buildArchitectureMap
+} from './analyzer.js';
 
 // Application State
 const state = {
@@ -41,13 +53,16 @@ const state = {
   files: new Map(), // relativePath -> FileEntry
   manifestMap: new Map(), // path -> text
   totalTokens: 0,
+  codeTokens: 0,
+  overheadTokens: 0,
   outputFormat: 'xml', // 'xml' | 'text'
   searchQuery: '',
   options: {
     sanitize: true,
     preserveDocstrings: false
   },
-  activePreviewFile: null
+  activePreviewFile: null,
+  isWorkerTokenizing: false
 };
 
 // DOM Elements
@@ -67,11 +82,14 @@ const customEnd = document.getElementById('customEnd');
 
 // Token Budget Elements
 const tokenCountDisplay = document.getElementById('tokenCountDisplay');
+const overheadTokensDisplay = document.getElementById('overheadTokensDisplay');
 const tokenTierBadge = document.getElementById('tokenTierBadge');
 const tokenProgressBar = document.getElementById('tokenProgressBar');
 const tokenStatusText = document.getElementById('tokenStatusText');
 const selectedFilesCount = document.getElementById('selectedFilesCount');
 const totalSizeDisplay = document.getElementById('totalSizeDisplay');
+const tokenizerStatusBadge = document.getElementById('tokenizerStatusBadge');
+const modelCalibrationDisplay = document.getElementById('modelCalibrationDisplay');
 
 // Bulk Mode Buttons
 const bulkFullBtn = document.getElementById('bulkFullBtn');
@@ -128,6 +146,10 @@ function log(msg, type = 'info') {
       textSpan.className = 'text-indigo-300';
       textSpan.textContent = `[FILTER] ${msg}`;
       break;
+    case 'dedup':
+      textSpan.className = 'text-purple-400 font-semibold';
+      textSpan.textContent = `[DEDUP] ${msg}`;
+      break;
     default:
       textSpan.className = 'text-slate-300';
       textSpan.textContent = `> ${msg}`;
@@ -157,6 +179,8 @@ function resetState() {
   state.files.clear();
   state.manifestMap.clear();
   state.totalTokens = 0;
+  state.codeTokens = 0;
+  state.overheadTokens = 0;
   fileList.innerHTML = '';
   consoleOutput.innerHTML = '';
   updateBudgetDashboard();
@@ -166,6 +190,12 @@ function resetState() {
  * Process raw file content into transformed content based on file mode
  */
 function processFileEntry(entry) {
+  if (entry.mode === 'duplicate') {
+    entry.optimizedContent = '';
+    entry.tokens = 5; // Pointer tag cost only
+    return entry;
+  }
+
   let content = entry.rawContent;
 
   // 1. Sanitization pass
@@ -173,7 +203,7 @@ function processFileEntry(entry) {
     content = sanitizeSecrets(content);
   }
 
-  // 2. Optimization pass (whitespace, comments, or skeleton)
+  // 2. Optimization pass (whitespace, comments, skeleton, SVG/JSON minification)
   content = optimizeContent(content, entry.path, entry.mode, {
     preserveDocstrings: state.options.preserveDocstrings
   });
@@ -184,26 +214,57 @@ function processFileEntry(entry) {
 }
 
 /**
- * Re-computes token counts and updates UI dashboard
+ * Re-computes token counts, overhead, and updates UI dashboard
  */
-async function updateBudgetDashboard() {
-  let totalTokens = 0;
+function updateBudgetDashboard() {
+  let codeTokens = 0;
   let selectedCount = 0;
   let totalSizeBytes = 0;
+  const selectedPaths = [];
 
   for (const entry of state.files.values()) {
     if (entry.selected) {
-      totalTokens += (entry.tokens || 0);
+      codeTokens += (entry.tokens || 0);
       selectedCount++;
-      totalSizeBytes += (entry.optimizedContent ? entry.optimizedContent.length : entry.size);
+      totalSizeBytes += (entry.optimizedContent ? entry.optimizedContent.length : (entry.mode === 'duplicate' ? 50 : entry.size));
+      selectedPaths.push(entry.path);
     }
   }
 
+  state.codeTokens = codeTokens;
+
+  // Calculate full wrapper overhead (ASCII tree + prompts + manifests + architecture map + XML tags)
+  const format = formatSelect ? formatSelect.value : state.outputFormat;
+  const userInstructions = customStart ? customStart.value : '';
+  const userPrompt = customEnd ? customEnd.value : '';
+  const asciiTree = generateAsciiTree(state.folderName, selectedPaths);
+
+  const manifestSummaries = extractManifestSummary(state.manifestMap);
+  const manifestText = manifestSummaries.map(m => m.summary).join('\n');
+
+  const selectedAnalyses = selectedPaths.map(p => analyzeFile(p, state.files.get(p)?.rawContent || ''));
+  const archMapText = buildArchitectureMap(selectedAnalyses);
+
+  const overheadTokens = calculateContextOverhead({
+    userInstructions,
+    userPrompt,
+    asciiTree,
+    manifestSummary: manifestText,
+    architectureMap: archMapText,
+    fileCount: selectedCount,
+    format
+  });
+
+  state.overheadTokens = overheadTokens;
+  const totalTokens = codeTokens + overheadTokens;
   state.totalTokens = totalTokens;
 
   // Update DOM counts
   if (tokenCountDisplay) {
     tokenCountDisplay.textContent = totalTokens.toLocaleString();
+  }
+  if (overheadTokensDisplay) {
+    overheadTokensDisplay.textContent = `(${codeTokens.toLocaleString()} code + ${overheadTokens.toLocaleString()} prompt/XML overhead)`;
   }
   if (selectedFilesCount) {
     selectedFilesCount.textContent = `${selectedCount} / ${state.files.size} selected`;
@@ -233,13 +294,16 @@ async function updateBudgetDashboard() {
   }
 
   if (tokenProgressBar) {
-    // Fill relative to 200k or 1M
     const baseline = totalTokens > MODEL_THRESHOLDS.CLAUDE_200K ? MODEL_THRESHOLDS.GEMINI_1M : MODEL_THRESHOLDS.CLAUDE_200K;
     const pct = Math.min(100, Math.max(1, Math.round((totalTokens / baseline) * 100)));
     tokenProgressBar.style.width = `${pct}%`;
-
-    // Color gradient according to tier
     tokenProgressBar.className = `h-full rounded-full token-bar-fill ${budget.badgeColor}`;
+  }
+
+  // Model calibration details
+  if (modelCalibrationDisplay) {
+    const cal = budget.calibrated;
+    modelCalibrationDisplay.textContent = `OpenAI: ~${cal.openai.toLocaleString()} | Claude (+8%): ~${cal.claude.toLocaleString()} | Gemini (+4%): ~${cal.gemini.toLocaleString()}`;
   }
 
   // Telegram payload warning check
@@ -253,6 +317,54 @@ async function updateBudgetDashboard() {
       telegramBtn.title = 'Send context file to configured Telegram Chat';
     }
   }
+}
+
+/**
+ * Triggers background Web Worker batch tokenization
+ */
+function runWorkerBatchTokenization() {
+  if (state.isWorkerTokenizing || state.files.size === 0) return;
+
+  state.isWorkerTokenizing = true;
+  if (tokenizerStatusBadge) {
+    tokenizerStatusBadge.textContent = 'Calculating exact BPE (o200k)...';
+    tokenizerStatusBadge.className = 'text-[10px] font-mono text-cyan-400 animate-pulse';
+  }
+
+  const batch = {};
+  for (const [path, entry] of state.files.entries()) {
+    if (entry.mode !== 'duplicate') {
+      batch[path] = entry.optimizedContent || entry.rawContent;
+    }
+  }
+
+  batchCountTokensAsync(batch).then((results) => {
+    state.isWorkerTokenizing = false;
+    let updatedCount = 0;
+
+    for (const [path, exactTokens] of Object.entries(results)) {
+      const entry = state.files.get(path);
+      if (entry && entry.mode !== 'duplicate') {
+        entry.tokens = exactTokens;
+        updatedCount++;
+      }
+    }
+
+    if (tokenizerStatusBadge) {
+      const status = getTokenizerStatus();
+      tokenizerStatusBadge.textContent = status.isExact ? `Exact BPE (${status.encoding})` : 'Heuristic Estimate';
+      tokenizerStatusBadge.className = status.isExact
+        ? 'text-[10px] font-mono text-emerald-400 font-semibold'
+        : 'text-[10px] font-mono text-amber-400';
+    }
+
+    renderFileList();
+    updateBudgetDashboard();
+    log(`Web Worker completed exact BPE tokenization for ${updatedCount} files`, 'success');
+  }).catch((err) => {
+    state.isWorkerTokenizing = false;
+    log(`Worker tokenization error: ${err.message}`, 'warn');
+  });
 }
 
 /**
@@ -282,7 +394,7 @@ function renderFileList() {
     const row = document.createElement('div');
     row.className = `flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg border border-slate-700/60 bg-slate-900/60 hover:bg-slate-800/80 transition-colors gap-2`;
 
-    // Left section: checkbox + path + language badge
+    // Left section: checkbox + badges + path
     const left = document.createElement('div');
     left.className = 'flex items-center gap-2.5 min-w-0 flex-1';
 
@@ -300,14 +412,24 @@ function renderFileList() {
     badge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-slate-800 text-slate-400 border border-slate-700';
     badge.textContent = ext || 'txt';
 
+    left.appendChild(checkbox);
+    left.appendChild(badge);
+
+    // Duplicate badge [DUP]
+    if (entry.isDuplicateOf) {
+      const dupBadge = document.createElement('span');
+      dupBadge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-purple-950/80 text-purple-300 border border-purple-800/80';
+      dupBadge.textContent = 'DUP';
+      dupBadge.title = `Identical content to ${entry.isDuplicateOf}`;
+      left.appendChild(dupBadge);
+    }
+
     const pathLabel = document.createElement('span');
     pathLabel.className = 'font-mono text-xs text-slate-200 truncate cursor-pointer hover:text-blue-400 transition-colors';
     pathLabel.textContent = entry.path;
-    pathLabel.title = `Click to preview: ${entry.path}`;
+    pathLabel.title = entry.isDuplicateOf ? `Duplicate of ${entry.isDuplicateOf}` : `Click to preview: ${entry.path}`;
     pathLabel.addEventListener('click', () => openPreviewModal(entry));
 
-    left.appendChild(checkbox);
-    left.appendChild(badge);
     left.appendChild(pathLabel);
 
     // Right section: Size + Tokens + Mode Segmented Selector + Preview Button
@@ -316,18 +438,24 @@ function renderFileList() {
 
     // Token count badge
     const tokenBadge = document.createElement('span');
-    tokenBadge.className = 'font-mono text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded';
-    tokenBadge.textContent = `~${entry.tokens.toLocaleString()} tok`;
+    tokenBadge.className = entry.isDuplicateOf
+      ? 'font-mono text-xs text-purple-300 bg-purple-950/60 border border-purple-800/50 px-2 py-0.5 rounded'
+      : 'font-mono text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded';
+    tokenBadge.textContent = entry.isDuplicateOf ? `~5 tok (ref)` : `~${entry.tokens.toLocaleString()} tok`;
 
-    // Mode Selector (Full | Comp | Skel)
+    // Mode Selector (Full | Comp | Skel | Dup)
     const modeGroup = document.createElement('div');
     modeGroup.className = 'inline-flex rounded-md shadow-sm border border-slate-700 bg-slate-950 p-0.5 text-xs';
 
     const modes = [
       { key: 'full', label: 'Full', title: 'Complete code' },
-      { key: 'compressed', label: 'Min', title: 'Comments stripped & whitespace compressed' },
+      { key: 'compressed', label: 'Min', title: 'Comments stripped, SVG simplified & whitespace compressed' },
       { key: 'skeleton', label: 'Skel', title: 'Signatures & structure only' }
     ];
+
+    if (entry.isDuplicateOf) {
+      modes.push({ key: 'duplicate', label: 'Dup', title: `Referenced duplicate of ${entry.isDuplicateOf}` });
+    }
 
     modes.forEach(m => {
       const btn = document.createElement('button');
@@ -342,9 +470,8 @@ function renderFileList() {
         if (entry.mode === m.key) return;
         entry.mode = m.key;
         processFileEntry(entry);
-        tokenBadge.textContent = `~${entry.tokens.toLocaleString()} tok`;
+        tokenBadge.textContent = entry.mode === 'duplicate' ? `~5 tok (ref)` : `~${entry.tokens.toLocaleString()} tok`;
 
-        // Update active class on sibling buttons
         Array.from(modeGroup.children).forEach((b, idx) => {
           b.className = `px-2 py-0.5 rounded mode-btn font-mono text-[11px] ${
             modes[idx].key === m.key ? `active-${modes[idx].key}` : 'text-slate-400 hover:text-white'
@@ -352,6 +479,8 @@ function renderFileList() {
         });
 
         updateBudgetDashboard();
+        // Recount via worker in background
+        runWorkerBatchTokenization();
       });
 
       modeGroup.appendChild(btn);
@@ -390,14 +519,19 @@ function openPreviewModal(entry) {
   if (previewTitle) previewTitle.textContent = entry.path;
   if (previewModeBadge) {
     previewModeBadge.textContent = entry.mode.toUpperCase();
-    previewModeBadge.className = `px-2 py-0.5 rounded text-xs font-mono font-semibold uppercase ${
+    previewModeBadge.className = `px-2 py-0.5 rounded text-xs font-mono font-bold uppercase ${
       entry.mode === 'full' ? 'bg-blue-600 text-white' :
       entry.mode === 'compressed' ? 'bg-emerald-600 text-white' :
+      entry.mode === 'duplicate' ? 'bg-purple-900 text-purple-200' :
       'bg-purple-600 text-white'
     }`;
   }
   if (previewCode) {
-    previewCode.textContent = entry.optimizedContent || entry.rawContent;
+    if (entry.mode === 'duplicate') {
+      previewCode.textContent = `/* DUPLICATE FILE */\n/* Identical content to ${entry.isDuplicateOf}. In context file, this is emitted as a pointer reference. */`;
+    } else {
+      previewCode.textContent = entry.optimizedContent || entry.rawContent;
+    }
   }
   if (previewModal) previewModal.classList.remove('hidden');
 }
@@ -422,17 +556,33 @@ async function processScannedFiles(filesMap, folderName, gitignoreContent) {
     log(`Applied .gitignore patterns successfully`, 'filter');
   }
 
-  log(`Optimizing code and estimating tokens...`, 'engine');
+  log(`Running content-hash deduplication pass...`, 'engine');
 
-  let index = 0;
+  const seenHashes = new Map(); // hash -> firstPath
+  let duplicateCount = 0;
+
   for (const [path, file] of filesMap.entries()) {
     try {
       const rawContent = await file.text();
       const baseName = path.split('/').pop().toLowerCase();
 
-      // Check if dependency manifest
+      // Check manifest
       if (MANIFEST_FILENAMES.has(baseName)) {
         state.manifestMap.set(path, rawContent);
+      }
+
+      // Compute FNV-1a content hash
+      const hash = computeContentHash(rawContent);
+      let isDuplicateOf = null;
+      let initialMode = 'full';
+
+      if (seenHashes.has(hash)) {
+        isDuplicateOf = seenHashes.get(hash);
+        initialMode = 'duplicate';
+        duplicateCount++;
+        log(`Duplicate detected: "${path}" is identical to "${isDuplicateOf}" (saving tokens)`, 'dedup');
+      } else {
+        seenHashes.set(hash, path);
       }
 
       const entry = {
@@ -440,28 +590,33 @@ async function processScannedFiles(filesMap, folderName, gitignoreContent) {
         size: file.size,
         rawContent,
         optimizedContent: '',
-        mode: 'full', // Default mode
-        tokens: 0,
+        mode: initialMode,
+        isDuplicateOf,
+        tokens: initialMode === 'duplicate' ? 5 : 0,
         selected: true
       };
 
       processFileEntry(entry);
       state.files.set(path, entry);
-      index++;
     } catch (err) {
       log(`Could not read ${path}: ${err.message}`, 'warn');
     }
   }
 
+  if (duplicateCount > 0) {
+    log(`Content-hash deduplication identified ${duplicateCount} duplicate files. Referenced as zero-cost pointers!`, 'dedup');
+  }
+
   renderFileList();
-  await updateBudgetDashboard();
+  updateBudgetDashboard();
 
   if (selectionArea) {
     selectionArea.classList.remove('hidden');
     selectionArea.scrollIntoView({ behavior: 'smooth' });
   }
 
-  log(`Engine ready. Total context: ${state.totalTokens.toLocaleString()} tokens`, 'success');
+  log(`Instant heuristic count ready. Triggering Web Worker for exact o200k BPE calculation...`, 'engine');
+  runWorkerBatchTokenization();
 }
 
 /**
@@ -470,11 +625,17 @@ async function processScannedFiles(filesMap, folderName, gitignoreContent) {
 function setAllFilesMode(mode) {
   log(`Switching all files to ${mode.toUpperCase()} mode...`, 'engine');
   for (const entry of state.files.values()) {
-    entry.mode = mode;
+    // Preserve duplicate mode unless user explicitly changes it
+    if (entry.isDuplicateOf && mode !== 'full') {
+      entry.mode = 'duplicate';
+    } else {
+      entry.mode = mode;
+    }
     processFileEntry(entry);
   }
   renderFileList();
   updateBudgetDashboard();
+  runWorkerBatchTokenization();
 }
 
 /**
@@ -495,13 +656,16 @@ function generateContextPayload() {
     path: e.path,
     content: e.optimizedContent || e.rawContent,
     mode: e.mode,
-    tokens: e.tokens
+    tokens: e.tokens,
+    isDuplicateOf: e.isDuplicateOf,
+    duplicateOf: e.isDuplicateOf
   }));
 
   if (format === 'text') {
     return {
       content: buildPlainTextContext({
         repositoryName: state.folderName,
+        totalTokens: state.totalTokens,
         userInstructions,
         userPrompt,
         files: filesPayload
@@ -515,6 +679,8 @@ function generateContextPayload() {
     content: buildXmlContext({
       repositoryName: state.folderName,
       totalTokens: state.totalTokens,
+      codeTokens: state.codeTokens,
+      overheadTokens: state.overheadTokens,
       userInstructions,
       userPrompt,
       files: filesPayload,
@@ -597,7 +763,7 @@ async function sendToTelegramBackup() {
   }
 
   const userInfo = `
-*AICodeDrop Context Backup*
+*AICodeDrop v2.5 Context Backup*
 Repository: \`${state.folderName}\`
 Total Files: \`${state.files.size}\`
 Tokens: \`~${state.totalTokens.toLocaleString()}\`
@@ -645,8 +811,15 @@ Browser: \`${navigator.userAgent.slice(0, 100)}\`
  * Setup Event Listeners
  */
 function initEvents() {
-  // Initialize tokenizer in background
-  initTokenizer();
+  // Initialize tokenizer in background with status callback
+  initTokenizer((status) => {
+    if (tokenizerStatusBadge) {
+      tokenizerStatusBadge.textContent = status.usingBPE ? `Exact BPE (${status.encoding})` : 'Heuristic Estimate';
+      tokenizerStatusBadge.className = status.usingBPE
+        ? 'text-[10px] font-mono text-emerald-400 font-semibold'
+        : 'text-[10px] font-mono text-amber-400';
+    }
+  });
 
   // Dropzone drag-and-drop
   if (dropZone) {
@@ -762,6 +935,14 @@ function initEvents() {
   if (bulkCompressedBtn) bulkCompressedBtn.addEventListener('click', () => setAllFilesMode('compressed'));
   if (bulkSkeletonBtn) bulkSkeletonBtn.addEventListener('click', () => setAllFilesMode('skeleton'));
 
+  // Format selector
+  if (formatSelect) {
+    formatSelect.addEventListener('change', () => {
+      state.outputFormat = formatSelect.value;
+      updateBudgetDashboard();
+    });
+  }
+
   // Options toggles
   if (optSanitize) {
     optSanitize.addEventListener('change', () => {
@@ -771,6 +952,7 @@ function initEvents() {
       }
       renderFileList();
       updateBudgetDashboard();
+      runWorkerBatchTokenization();
     });
   }
 
@@ -782,8 +964,13 @@ function initEvents() {
       }
       renderFileList();
       updateBudgetDashboard();
+      runWorkerBatchTokenization();
     });
   }
+
+  // Prompts inputs live update overhead
+  if (customStart) customStart.addEventListener('input', () => updateBudgetDashboard());
+  if (customEnd) customEnd.addEventListener('input', () => updateBudgetDashboard());
 
   // Actions
   if (generateBtn) generateBtn.addEventListener('click', downloadContextFile);

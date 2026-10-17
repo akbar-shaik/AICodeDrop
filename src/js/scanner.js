@@ -1,5 +1,5 @@
 /**
- * scanner.js - Directory Ingestion, .gitignore Parser, Token Sink Purge & Secret Sanitizer
+ * scanner.js - Directory Ingestion, .gitignore Parser, Token Sink Purge, Secret Sanitizer & Content Deduplication
  */
 
 // Zero-Value Token Sinks: Lockfiles and Minified code
@@ -33,12 +33,17 @@ export const BINARY_EXTENSIONS = new Set([
   'sqlite', 'db', 'duckdb'
 ]);
 
-// Default ignored directories
+// Default ignored directories (case-insensitive check)
 export const DEFAULT_IGNORE_DIRS = new Set([
   'node_modules', '.git', '.next', '.nuxt', 'dist', 'build', 'out',
   '__pycache__', 'venv', '.venv', 'env', '.env', '.idea', '.vscode',
-  '.turbo', '.cache', 'coverage', '.svn', '.hg'
+  '.turbo', '.cache', 'coverage', '.svn', '.hg', 'deploy', '.netlify'
 ]);
+
+export function isDefaultIgnoredDir(dirName) {
+  if (!dirName) return false;
+  return DEFAULT_IGNORE_DIRS.has(dirName.toLowerCase());
+}
 
 // Supported source extensions for code processing
 export const ALLOWED_EXTENSIONS = new Set([
@@ -67,9 +72,24 @@ export const MANIFEST_FILENAMES = new Set([
 export const MAX_INDIVIDUAL_FILE_SIZE = 2 * 1024 * 1024; // 2MB safety ceiling
 
 /**
- * Compiles a single .gitignore line into a RegExp
+ * Fast 64-bit FNV-1a Hash for deterministic content deduplication
  */
-export function parseGitignoreRule(rawLine) {
+export function computeContentHash(content) {
+  if (!content) return '0000000000000000';
+  let h1 = 0x811c9dc5;
+  let h2 = 0x1000193;
+  for (let i = 0; i < content.length; i++) {
+    const ch = content.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 0x1000193);
+    h2 = Math.imul(h2 ^ (ch >>> 8), 0x811c9dc5);
+  }
+  return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Compiles a single .gitignore line into a RegExp scoped to an optional folder prefix
+ */
+export function parseGitignoreRule(rawLine, scopePrefix = '') {
   let line = rawLine.trim();
   if (!line || line.startsWith('#')) return null;
 
@@ -89,6 +109,11 @@ export function parseGitignoreRule(rawLine) {
     line = line.substring(1);
   }
 
+  // Prepend scope prefix if nested .gitignore
+  if (scopePrefix) {
+    line = scopePrefix.replace(/^\/+|\/+$/g, '') + '/' + line;
+  }
+
   // Escape special regex chars except * and ?
   let regexStr = line
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
@@ -97,7 +122,7 @@ export function parseGitignoreRule(rawLine) {
     .replace(/\?/g, '[^/]')
     .replace(/§§GLOBSTAR§§/g, '.*');
 
-  if (isRootAnchored) {
+  if (isRootAnchored || scopePrefix) {
     regexStr = '^' + regexStr;
   } else {
     regexStr = '(?:^|/)' + regexStr;
@@ -122,27 +147,25 @@ export function parseGitignoreRule(rawLine) {
 }
 
 /**
- * Parses full .gitignore file content into matcher rules
+ * Parses .gitignore file content into matcher rules
  */
-export function compileGitignore(gitignoreContent) {
+export function compileGitignore(gitignoreContent, scopePrefix = '') {
   if (!gitignoreContent) return () => false;
 
   const lines = gitignoreContent.split(/\r?\n/);
   const rules = [];
 
   for (const line of lines) {
-    const rule = parseGitignoreRule(line);
+    const rule = parseGitignoreRule(line, scopePrefix);
     if (rule) rules.push(rule);
   }
 
   return function isIgnored(relativePath, isDirectory = false) {
-    // Normalize path with forward slashes, strip leading slash
     const normalized = relativePath.replace(/\\/g, '/').replace(/^\//, '');
     let ignored = false;
 
     for (const rule of rules) {
       if (rule.isDirectoryOnly && !isDirectory && !normalized.endsWith('/')) {
-        // If rule requires directory, only match if directory
         continue;
       }
       if (rule.regex.test(normalized)) {
@@ -151,6 +174,27 @@ export function compileGitignore(gitignoreContent) {
     }
     return ignored;
   };
+}
+
+/**
+ * Scoped Gitignore Manager for multiple / nested .gitignore files
+ */
+export class GitignoreManager {
+  constructor() {
+    this.matchers = [];
+  }
+
+  addRules(content, scopePrefix = '') {
+    if (!content) return;
+    this.matchers.push(compileGitignore(content, scopePrefix));
+  }
+
+  isIgnored(path, isDirectory = false) {
+    for (const matcher of this.matchers) {
+      if (matcher(path, isDirectory)) return true;
+    }
+    return false;
+  }
 }
 
 /**
@@ -168,17 +212,17 @@ export function sanitizeSecrets(content) {
     '/* <REDACTED_PRIVATE_KEY> */'
   );
 
-  // 2. Telegram Bot Tokens (e.g. 123456789:ABCdefGHIjklMNOpqrsTUVwxyz123456789)
+  // 2. Telegram Bot Tokens
   sanitized = sanitized.replace(/\b\d{8,10}:[A-Za-z0-9_-]{35}\b/g, '<REDACTED_TELEGRAM_TOKEN>');
 
-  // 3. AWS Access Keys (AKIA, ASIA, ABIA, ACCA followed by 16 alphanumerics)
+  // 3. AWS Access Keys
   sanitized = sanitized.replace(/\b(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\b/g, '<REDACTED_AWS_ACCESS_KEY>');
 
-  // 4. GitHub Personal Access Tokens (ghp_, gho_, ghu_, ghs_, ghr_, github_pat_)
+  // 4. GitHub Personal Access Tokens
   sanitized = sanitized.replace(/\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}\b/g, '<REDACTED_GITHUB_TOKEN>');
   sanitized = sanitized.replace(/\bgithub_pat_[A-Za-z0-9_]{82}\b/g, '<REDACTED_GITHUB_TOKEN>');
 
-  // 5. OpenAI / Anthropic / AI API Keys (sk-..., sk-ant-...)
+  // 5. OpenAI / Anthropic / AI API Keys
   sanitized = sanitized.replace(/\bsk-(?:proj-|ant-)?[A-Za-z0-9_-]{32,}\b/g, '<REDACTED_AI_KEY>');
 
   // 6. Generic password / secret assignments in code/configs (.env, json, js, py)
@@ -211,7 +255,6 @@ export function getExtension(fileName) {
   const base = fileName.split('/').pop().split('\\').pop();
   const lastDot = base.lastIndexOf('.');
   if (lastDot === -1 || lastDot === 0) {
-    // If it starts with dot (.env, .gitignore)
     return base.startsWith('.') ? base.substring(1).toLowerCase() : '';
   }
   return base.substring(lastDot + 1).toLowerCase();
@@ -234,13 +277,14 @@ export function isEligibleFile(fileName) {
 
 /**
  * Traverses a FileSystemEntry hierarchy (drag and drop)
+ * Supports multiple dropped folders/files and nested .gitignore files.
  */
 export async function scanFileSystemEntries(items, onProgress) {
   const filesMap = new Map(); // relativePath -> File
-  let gitignoreContent = null;
+  const gitignoreManager = new GitignoreManager();
   let rootFolderName = 'project';
+  let primaryGitignoreContent = null;
 
-  // Read directory entries in batches
   async function readAllDirEntries(dirReader) {
     const entries = [];
     let batch = await new Promise((res, rej) => dirReader.readEntries(res, rej));
@@ -251,45 +295,59 @@ export async function scanFileSystemEntries(items, onProgress) {
     return entries;
   }
 
-  // Phase 1: Locate and read root .gitignore if present
+  // Phase 1: Scan for root .gitignore across all dropped items
   for (const item of items) {
     const entry = typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : item;
     if (!entry) continue;
 
     if (entry.isDirectory) {
-      rootFolderName = entry.name;
-      const dirReader = entry.createReader();
-      const firstLevelEntries = await readAllDirEntries(dirReader);
-      const giEntry = firstLevelEntries.find(e => e.isFile && e.name === '.gitignore');
-      if (giEntry) {
-        try {
-          const giFile = await new Promise((res, rej) => giEntry.file(res, rej));
-          gitignoreContent = await giFile.text();
-          if (onProgress) onProgress({ type: 'gitignore_found', name: '.gitignore' });
-        } catch (_) {}
+      if (rootFolderName === 'project') {
+        rootFolderName = entry.name;
       }
-      break;
+      try {
+        const dirReader = entry.createReader();
+        const firstLevelEntries = await readAllDirEntries(dirReader);
+        const giEntry = firstLevelEntries.find(e => e.isFile && e.name === '.gitignore');
+        if (giEntry) {
+          const giFile = await new Promise((res, rej) => giEntry.file(res, rej));
+          const text = await giFile.text();
+          gitignoreManager.addRules(text, '');
+          if (!primaryGitignoreContent) primaryGitignoreContent = text;
+          if (onProgress) onProgress({ type: 'gitignore_found', name: '.gitignore' });
+        }
+      } catch (_) {}
     }
   }
 
-  const gitignoreMatcher = compileGitignore(gitignoreContent);
-
-  // Phase 2: Traverse files recursively
+  // Phase 2: Traverse all files & folders recursively
   async function traverse(entry, currentPath = '') {
     if (!entry) return;
 
     if (entry.isDirectory) {
-      if (DEFAULT_IGNORE_DIRS.has(entry.name)) {
+      if (isDefaultIgnoredDir(entry.name)) {
         if (onProgress) onProgress({ type: 'ignored_dir', path: currentPath + entry.name });
         return;
       }
-      if (gitignoreMatcher(currentPath + entry.name, true)) {
+
+      if (gitignoreManager.isIgnored(currentPath + entry.name, true)) {
         if (onProgress) onProgress({ type: 'gitignore_ignored', path: currentPath + entry.name });
         return;
       }
 
       const reader = entry.createReader();
       const entries = await readAllDirEntries(reader);
+
+      // Check for nested .gitignore in this folder
+      const nestedGi = entries.find(e => e.isFile && e.name === '.gitignore');
+      if (nestedGi) {
+        try {
+          const giFile = await new Promise((res, rej) => nestedGi.file(res, rej));
+          const text = await giFile.text();
+          gitignoreManager.addRules(text, currentPath + entry.name);
+          if (onProgress) onProgress({ type: 'gitignore_found', name: `${currentPath}${entry.name}/.gitignore` });
+        } catch (_) {}
+      }
+
       for (const child of entries) {
         await traverse(child, currentPath + entry.name + '/');
       }
@@ -301,7 +359,7 @@ export async function scanFileSystemEntries(items, onProgress) {
         return;
       }
 
-      if (gitignoreMatcher(relPath, false)) {
+      if (gitignoreManager.isIgnored(relPath, false)) {
         if (onProgress) onProgress({ type: 'gitignore_ignored', path: relPath });
         return;
       }
@@ -332,7 +390,7 @@ export async function scanFileSystemEntries(items, onProgress) {
     }
   }
 
-  return { rootFolderName, filesMap, gitignoreContent };
+  return { rootFolderName, filesMap, gitignoreContent: primaryGitignoreContent };
 }
 
 /**
@@ -340,36 +398,39 @@ export async function scanFileSystemEntries(items, onProgress) {
  */
 export async function scanFileList(fileList, onProgress) {
   const filesMap = new Map();
+  const gitignoreManager = new GitignoreManager();
   let rootFolderName = 'project';
-  let gitignoreContent = null;
+  let primaryGitignoreContent = null;
 
   if (!fileList || fileList.length === 0) {
-    return { rootFolderName, filesMap, gitignoreContent };
+    return { rootFolderName, filesMap, gitignoreContent: null };
   }
 
-  // Extract root folder name
   const firstPath = fileList[0].webkitRelativePath || fileList[0].name;
   if (firstPath.includes('/')) {
     rootFolderName = firstPath.split('/')[0];
   }
 
-  // Find root .gitignore first
+  // Pre-pass: Find all .gitignore files (root and nested)
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
-    const rel = file.webkitRelativePath
-      ? file.webkitRelativePath.substring(file.webkitRelativePath.indexOf('/') + 1)
-      : file.name;
+    const rawPath = file.webkitRelativePath || file.name;
+    const relPath = rawPath.includes('/')
+      ? rawPath.substring(rawPath.indexOf('/') + 1)
+      : rawPath;
 
-    if (rel === '.gitignore') {
+    if (relPath.endsWith('.gitignore')) {
       try {
-        gitignoreContent = await file.text();
-        if (onProgress) onProgress({ type: 'gitignore_found', name: '.gitignore' });
+        const text = await file.text();
+        const scope = relPath === '.gitignore' ? '' : relPath.replace(/\.gitignore$/, '');
+        gitignoreManager.addRules(text, scope);
+        if (relPath === '.gitignore' && !primaryGitignoreContent) {
+          primaryGitignoreContent = text;
+        }
+        if (onProgress) onProgress({ type: 'gitignore_found', name: relPath });
       } catch (_) {}
-      break;
     }
   }
-
-  const gitignoreMatcher = compileGitignore(gitignoreContent);
 
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
@@ -378,10 +439,9 @@ export async function scanFileList(fileList, onProgress) {
       ? rawPath.substring(rawPath.indexOf('/') + 1)
       : rawPath;
 
-    // Check directory components against ignore list
     const parts = relPath.split('/');
     const dirParts = parts.slice(0, -1);
-    if (dirParts.some(d => DEFAULT_IGNORE_DIRS.has(d))) {
+    if (dirParts.some(d => isDefaultIgnoredDir(d))) {
       continue;
     }
 
@@ -391,7 +451,7 @@ export async function scanFileList(fileList, onProgress) {
       continue;
     }
 
-    if (gitignoreMatcher(relPath, false)) {
+    if (gitignoreManager.isIgnored(relPath, false)) {
       if (onProgress) onProgress({ type: 'gitignore_ignored', path: relPath });
       continue;
     }
@@ -409,5 +469,5 @@ export async function scanFileList(fileList, onProgress) {
     if (onProgress) onProgress({ type: 'file_added', path: relPath, size: file.size });
   }
 
-  return { rootFolderName, filesMap, gitignoreContent };
+  return { rootFolderName, filesMap, gitignoreContent: primaryGitignoreContent };
 }

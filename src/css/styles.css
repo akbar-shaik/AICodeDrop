@@ -51,6 +51,12 @@
   font-weight: 600;
 }
 
+.mode-btn.active-duplicate {
+  background-color: #581c87;
+  color: #e9d5ff;
+  font-weight: 600;
+}
+
 /* Progress bar transitions */
 .token-bar-fill {
   transition: width 0.4s ease-out, background-color 0.4s ease-out;
