@@ -471,3 +471,62 @@ export async function scanFileList(fileList, onProgress) {
 
   return { rootFolderName, filesMap, gitignoreContent: primaryGitignoreContent };
 }
+
+/**
+ * Extracts directory path from a relative file path (e.g., 'src/js/app.js' -> 'src/js', 'index.html' -> '(root)')
+ */
+export function getFileDirectory(filePath) {
+  if (!filePath) return '(root)';
+  const normalized = filePath.replace(/\\/g, '/');
+  const lastSlash = normalized.lastIndexOf('/');
+  if (lastSlash === -1) {
+    return '(root)';
+  }
+  return normalized.substring(0, lastSlash);
+}
+
+/**
+ * Groups a collection of file entries by their parent directory
+ * Returns Map<directoryPath, Array<fileEntry>> sorted with (root) first, then alphabetically
+ */
+export function groupFilesByDirectory(files) {
+  const groups = new Map();
+  const entries = Array.isArray(files) ? files : Array.from(files.values());
+
+  for (const entry of entries) {
+    const dir = getFileDirectory(entry.path);
+    if (!groups.has(dir)) {
+      groups.set(dir, []);
+    }
+    groups.get(dir).push(entry);
+  }
+
+  // Sort directories: '(root)' always first, then alphabetical
+  const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+    if (a === '(root)') return -1;
+    if (b === '(root)') return 1;
+    return a.localeCompare(b);
+  });
+
+  const sortedMap = new Map();
+  for (const key of sortedKeys) {
+    sortedMap.set(key, groups.get(key));
+  }
+  return sortedMap;
+}
+
+/**
+ * Evaluates the selection state of a list of file entries:
+ * 'all' (all files selected) | 'none' (no files selected) | 'partial' (mixed)
+ */
+export function getFolderSelectionState(entries) {
+  if (!entries || entries.length === 0) return 'none';
+  let selectedCount = 0;
+  for (const entry of entries) {
+    if (entry.selected) selectedCount++;
+  }
+  if (selectedCount === 0) return 'none';
+  if (selectedCount === entries.length) return 'all';
+  return 'partial';
+}
+

@@ -18,7 +18,10 @@ import {
   sanitizeSecrets,
   computeContentHash,
   MANIFEST_FILENAMES,
-  getExtension
+  getExtension,
+  getFileDirectory,
+  groupFilesByDirectory,
+  getFolderSelectionState
 } from './scanner.js';
 
 import {
@@ -62,7 +65,9 @@ const state = {
     preserveDocstrings: false
   },
   activePreviewFile: null,
-  isWorkerTokenizing: false
+  isWorkerTokenizing: false,
+  viewMode: 'grouped', // 'grouped' | 'flat'
+  collapsedFolders: new Set()
 };
 
 // DOM Elements
@@ -79,6 +84,16 @@ const copyBtn = document.getElementById('copyBtn');
 const telegramBtn = document.getElementById('telegramBtn');
 const customStart = document.getElementById('customStart');
 const customEnd = document.getElementById('customEnd');
+
+// Folder Selection & Grouping Controls
+const viewModeBtn = document.getElementById('viewModeBtn');
+const folderFilterBar = document.getElementById('folderFilterBar');
+const folderPillsContainer = document.getElementById('folderPillsContainer');
+const selectAllFoldersBtn = document.getElementById('selectAllFoldersBtn');
+const deselectAllFoldersBtn = document.getElementById('deselectAllFoldersBtn');
+const expandAllFoldersBtn = document.getElementById('expandAllFoldersBtn');
+const collapseAllFoldersBtn = document.getElementById('collapseAllFoldersBtn');
+const folderCountBadge = document.getElementById('folderCountBadge');
 
 // Token Budget Elements
 const tokenCountDisplay = document.getElementById('tokenCountDisplay');
@@ -178,11 +193,18 @@ function formatBytes(bytes) {
 function resetState() {
   state.files.clear();
   state.manifestMap.clear();
+  state.collapsedFolders.clear();
   state.totalTokens = 0;
   state.codeTokens = 0;
   state.overheadTokens = 0;
-  fileList.innerHTML = '';
-  consoleOutput.innerHTML = '';
+  if (fileList) fileList.innerHTML = '';
+  if (consoleOutput) consoleOutput.innerHTML = '';
+  if (folderPillsContainer) folderPillsContainer.innerHTML = '';
+  if (folderFilterBar) {
+    folderFilterBar.classList.add('hidden');
+    folderFilterBar.classList.remove('flex');
+  }
+  if (folderCountBadge) folderCountBadge.textContent = '';
   updateBudgetDashboard();
 }
 
@@ -368,9 +390,279 @@ function runWorkerBatchTokenization() {
 }
 
 /**
- * Renders the interactive file explorer table
+ * Toggle selection of all files inside a given directory
+ */
+function setFolderSelection(folderPath, isSelected) {
+  let count = 0;
+  for (const entry of state.files.values()) {
+    if (getFileDirectory(entry.path) === folderPath) {
+      entry.selected = isSelected;
+      count++;
+    }
+  }
+  log(`${isSelected ? 'Selected' : 'Deselected'} all ${count} files in "${folderPath}"`, 'engine');
+  renderFileList();
+  renderFolderPills();
+  updateBudgetDashboard();
+}
+
+/**
+ * Set mode (full | compressed | skeleton) for all files in a folder
+ */
+function setFolderMode(folderPath, mode) {
+  let count = 0;
+  for (const entry of state.files.values()) {
+    if (getFileDirectory(entry.path) === folderPath) {
+      if (entry.isDuplicateOf && mode !== 'full') {
+        entry.mode = 'duplicate';
+      } else {
+        entry.mode = mode;
+      }
+      processFileEntry(entry);
+      count++;
+    }
+  }
+  log(`Set mode "${mode.toUpperCase()}" for ${count} files in "${folderPath}"`, 'engine');
+  renderFileList();
+  renderFolderPills();
+  updateBudgetDashboard();
+  runWorkerBatchTokenization();
+}
+
+/**
+ * Toggle collapsed state of a folder in grouped view
+ */
+function toggleFolderCollapse(folderPath) {
+  if (state.collapsedFolders.has(folderPath)) {
+    state.collapsedFolders.delete(folderPath);
+  } else {
+    state.collapsedFolders.add(folderPath);
+  }
+  renderFileList();
+}
+
+/**
+ * Renders the folder pills/chips above the file list
+ */
+function renderFolderPills() {
+  if (!folderPillsContainer || !folderFilterBar) return;
+
+  const entries = Array.from(state.files.values());
+  if (entries.length === 0) {
+    folderFilterBar.classList.add('hidden');
+    folderFilterBar.classList.remove('flex');
+    return;
+  }
+
+  folderFilterBar.classList.remove('hidden');
+  folderFilterBar.classList.add('flex');
+
+  const folderMap = groupFilesByDirectory(entries);
+  if (folderCountBadge) {
+    folderCountBadge.textContent = `${folderMap.size} folder${folderMap.size === 1 ? '' : 's'}`;
+  }
+
+  folderPillsContainer.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+
+  for (const [folderPath, folderEntries] of folderMap.entries()) {
+    const selState = getFolderSelectionState(folderEntries);
+    const selectedCount = folderEntries.filter(e => e.selected).length;
+
+    const chip = document.createElement('div');
+    chip.className = `folder-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono border cursor-pointer select-none transition-colors ${
+      selState === 'all'
+        ? 'bg-blue-950/70 border-blue-600/70 text-blue-200 hover:bg-blue-900/80'
+        : selState === 'partial'
+        ? 'bg-amber-950/50 border-amber-600/60 text-amber-200 hover:bg-amber-900/70'
+        : 'bg-slate-900/60 border-slate-700/60 text-slate-400 hover:bg-slate-800/80 hover:text-slate-300'
+    }`;
+    chip.title = `Click to toggle selection for all files in "${folderPath}" (${selectedCount}/${folderEntries.length} selected)`;
+
+    // Checkbox inside pill
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = selState === 'all';
+    checkbox.indeterminate = selState === 'partial';
+    checkbox.className = 'w-3.5 h-3.5 rounded text-blue-500 bg-slate-800 border-slate-600 focus:ring-0 cursor-pointer pointer-events-none';
+
+    // Folder icon + Name
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'font-semibold truncate max-w-[150px]';
+    nameSpan.textContent = folderPath;
+
+    // Badge showing count
+    const countBadge = document.createElement('span');
+    countBadge.className = 'text-[10px] opacity-75';
+    countBadge.textContent = `(${selectedCount}/${folderEntries.length})`;
+
+    chip.appendChild(checkbox);
+    chip.appendChild(nameSpan);
+    chip.appendChild(countBadge);
+
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const shouldSelect = selState !== 'all';
+      setFolderSelection(folderPath, shouldSelect);
+    });
+
+    fragment.appendChild(chip);
+  }
+
+  folderPillsContainer.appendChild(fragment);
+}
+
+/**
+ * Synchronize a specific folder header without re-rendering entire list
+ */
+function syncFolderHeaderState(folderPath) {
+  if (!fileList) return;
+  const safePath = folderPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const folderHeader = fileList.querySelector(`[data-folder="${safePath}"]`);
+  if (!folderHeader) return;
+
+  const entriesInFolder = Array.from(state.files.values()).filter(e => getFileDirectory(e.path) === folderPath);
+  const selState = getFolderSelectionState(entriesInFolder);
+  const checkbox = folderHeader.querySelector('.folder-select-checkbox');
+  if (checkbox) {
+    checkbox.checked = selState === 'all';
+    checkbox.indeterminate = selState === 'partial';
+  }
+
+  const countBadge = folderHeader.querySelector('.folder-count-badge');
+  if (countBadge) {
+    const selCount = entriesInFolder.filter(e => e.selected).length;
+    countBadge.textContent = `${selCount}/${entriesInFolder.length} files`;
+  }
+}
+
+/**
+ * Creates a file row element
+ */
+function createFileRowElement(entry) {
+  const row = document.createElement('div');
+  row.className = `flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg border border-slate-700/60 bg-slate-900/60 hover:bg-slate-800/80 transition-colors gap-2`;
+
+  // Left section: checkbox + badges + path
+  const left = document.createElement('div');
+  left.className = 'flex items-center gap-2.5 min-w-0 flex-1';
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = entry.selected;
+  checkbox.className = 'w-4 h-4 rounded text-blue-500 bg-slate-800 border-slate-600 focus:ring-blue-500 focus:ring-offset-slate-900 cursor-pointer';
+  checkbox.addEventListener('change', () => {
+    entry.selected = checkbox.checked;
+    updateBudgetDashboard();
+    renderFolderPills();
+    syncFolderHeaderState(getFileDirectory(entry.path));
+  });
+
+  const ext = getExtension(entry.path);
+  const badge = document.createElement('span');
+  badge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-slate-800 text-slate-400 border border-slate-700';
+  badge.textContent = ext || 'txt';
+
+  left.appendChild(checkbox);
+  left.appendChild(badge);
+
+  // Duplicate badge [DUP]
+  if (entry.isDuplicateOf) {
+    const dupBadge = document.createElement('span');
+    dupBadge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-purple-950/80 text-purple-300 border border-purple-800/80';
+    dupBadge.textContent = 'DUP';
+    dupBadge.title = `Identical content to ${entry.isDuplicateOf}`;
+    left.appendChild(dupBadge);
+  }
+
+  const pathLabel = document.createElement('span');
+  pathLabel.className = 'font-mono text-xs text-slate-200 truncate cursor-pointer hover:text-blue-400 transition-colors';
+  pathLabel.textContent = entry.path;
+  pathLabel.title = entry.isDuplicateOf ? `Duplicate of ${entry.isDuplicateOf}` : `Click to preview: ${entry.path}`;
+  pathLabel.addEventListener('click', () => openPreviewModal(entry));
+
+  left.appendChild(pathLabel);
+
+  // Right section: Size + Tokens + Mode Segmented Selector + Preview Button
+  const right = document.createElement('div');
+  right.className = 'flex items-center gap-3 shrink-0 self-end sm:self-auto';
+
+  // Token count badge
+  const tokenBadge = document.createElement('span');
+  tokenBadge.className = entry.isDuplicateOf
+    ? 'font-mono text-xs text-purple-300 bg-purple-950/60 border border-purple-800/50 px-2 py-0.5 rounded'
+    : 'font-mono text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded';
+  tokenBadge.textContent = entry.isDuplicateOf ? `~5 tok (ref)` : `~${(entry.tokens || 0).toLocaleString()} tok`;
+
+  // Mode Selector (Full | Comp | Skel | Dup)
+  const modeGroup = document.createElement('div');
+  modeGroup.className = 'inline-flex rounded-md shadow-sm border border-slate-700 bg-slate-950 p-0.5 text-xs';
+
+  const modes = [
+    { key: 'full', label: 'Full', title: 'Complete code' },
+    { key: 'compressed', label: 'Min', title: 'Comments stripped, SVG simplified & whitespace compressed' },
+    { key: 'skeleton', label: 'Skel', title: 'Signatures & structure only' }
+  ];
+
+  if (entry.isDuplicateOf) {
+    modes.push({ key: 'duplicate', label: 'Dup', title: `Referenced duplicate of ${entry.isDuplicateOf}` });
+  }
+
+  modes.forEach(m => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `px-2 py-0.5 rounded mode-btn font-mono text-[11px] ${
+      entry.mode === m.key ? `active-${m.key}` : 'text-slate-400 hover:text-white'
+    }`;
+    btn.textContent = m.label;
+    btn.title = m.title;
+
+    btn.addEventListener('click', () => {
+      if (entry.mode === m.key) return;
+      entry.mode = m.key;
+      processFileEntry(entry);
+      tokenBadge.textContent = entry.mode === 'duplicate' ? `~5 tok (ref)` : `~${entry.tokens.toLocaleString()} tok`;
+
+      Array.from(modeGroup.children).forEach((b, idx) => {
+        b.className = `px-2 py-0.5 rounded mode-btn font-mono text-[11px] ${
+          modes[idx].key === m.key ? `active-${modes[idx].key}` : 'text-slate-400 hover:text-white'
+        }`;
+      });
+
+      updateBudgetDashboard();
+      runWorkerBatchTokenization();
+    });
+
+    modeGroup.appendChild(btn);
+  });
+
+  // Preview Button
+  const previewBtn = document.createElement('button');
+  previewBtn.type = 'button';
+  previewBtn.className = 'text-slate-400 hover:text-blue-400 p-1 transition-colors';
+  previewBtn.title = 'Preview transformed code';
+  previewBtn.innerHTML = `
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  `;
+  previewBtn.addEventListener('click', () => openPreviewModal(entry));
+
+  right.appendChild(tokenBadge);
+  right.appendChild(modeGroup);
+  right.appendChild(previewBtn);
+
+  row.appendChild(left);
+  row.appendChild(right);
+  return row;
+}
+
+/**
+ * Renders the interactive file explorer table (supporting Grouped by Folder & Flat List modes)
  */
 function renderFileList() {
+  if (!fileList) return;
   fileList.innerHTML = '';
 
   const query = state.searchQuery.toLowerCase().trim();
@@ -382,7 +674,7 @@ function renderFileList() {
   if (entries.length === 0) {
     fileList.innerHTML = `
       <div class="py-12 text-center text-slate-500 font-mono text-sm">
-        No files matching "${query}"
+        ${state.files.size === 0 ? 'No files loaded yet.' : `No files matching "${query}"`}
       </div>
     `;
     return;
@@ -390,123 +682,136 @@ function renderFileList() {
 
   const fragment = document.createDocumentFragment();
 
-  entries.forEach(entry => {
-    const row = document.createElement('div');
-    row.className = `flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg border border-slate-700/60 bg-slate-900/60 hover:bg-slate-800/80 transition-colors gap-2`;
-
-    // Left section: checkbox + badges + path
-    const left = document.createElement('div');
-    left.className = 'flex items-center gap-2.5 min-w-0 flex-1';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = entry.selected;
-    checkbox.className = 'w-4 h-4 rounded text-blue-500 bg-slate-800 border-slate-600 focus:ring-blue-500 focus:ring-offset-slate-900 cursor-pointer';
-    checkbox.addEventListener('change', () => {
-      entry.selected = checkbox.checked;
-      updateBudgetDashboard();
+  if (state.viewMode === 'flat') {
+    entries.forEach(entry => {
+      fragment.appendChild(createFileRowElement(entry));
     });
+  } else {
+    // Grouped by directory view
+    const folderMap = groupFilesByDirectory(entries);
 
-    const ext = getExtension(entry.path);
-    const badge = document.createElement('span');
-    badge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-slate-800 text-slate-400 border border-slate-700';
-    badge.textContent = ext || 'txt';
+    for (const [folderPath, folderEntries] of folderMap.entries()) {
+      const isCollapsed = state.collapsedFolders.has(folderPath);
+      const selState = getFolderSelectionState(folderEntries);
+      const selectedCount = folderEntries.filter(e => e.selected).length;
+      const folderTokens = folderEntries.reduce((sum, e) => sum + (e.isDuplicateOf ? 5 : (e.tokens || 0)), 0);
 
-    left.appendChild(checkbox);
-    left.appendChild(badge);
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'folder-group mb-2 border border-slate-800/80 rounded-xl overflow-hidden bg-slate-900/40';
 
-    // Duplicate badge [DUP]
-    if (entry.isDuplicateOf) {
-      const dupBadge = document.createElement('span');
-      dupBadge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-purple-950/80 text-purple-300 border border-purple-800/80';
-      dupBadge.textContent = 'DUP';
-      dupBadge.title = `Identical content to ${entry.isDuplicateOf}`;
-      left.appendChild(dupBadge);
-    }
+      // Folder Header
+      const header = document.createElement('div');
+      header.className = 'folder-header flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-slate-950/70 border-b border-slate-800/60 gap-2 select-none';
+      header.setAttribute('data-folder', folderPath);
 
-    const pathLabel = document.createElement('span');
-    pathLabel.className = 'font-mono text-xs text-slate-200 truncate cursor-pointer hover:text-blue-400 transition-colors';
-    pathLabel.textContent = entry.path;
-    pathLabel.title = entry.isDuplicateOf ? `Duplicate of ${entry.isDuplicateOf}` : `Click to preview: ${entry.path}`;
-    pathLabel.addEventListener('click', () => openPreviewModal(entry));
+      // Left: Chevron + Checkbox + Icon + Folder Path + Count/Tokens Badges
+      const left = document.createElement('div');
+      left.className = 'flex items-center gap-2 min-w-0 flex-1';
 
-    left.appendChild(pathLabel);
-
-    // Right section: Size + Tokens + Mode Segmented Selector + Preview Button
-    const right = document.createElement('div');
-    right.className = 'flex items-center gap-3 shrink-0 self-end sm:self-auto';
-
-    // Token count badge
-    const tokenBadge = document.createElement('span');
-    tokenBadge.className = entry.isDuplicateOf
-      ? 'font-mono text-xs text-purple-300 bg-purple-950/60 border border-purple-800/50 px-2 py-0.5 rounded'
-      : 'font-mono text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded';
-    tokenBadge.textContent = entry.isDuplicateOf ? `~5 tok (ref)` : `~${entry.tokens.toLocaleString()} tok`;
-
-    // Mode Selector (Full | Comp | Skel | Dup)
-    const modeGroup = document.createElement('div');
-    modeGroup.className = 'inline-flex rounded-md shadow-sm border border-slate-700 bg-slate-950 p-0.5 text-xs';
-
-    const modes = [
-      { key: 'full', label: 'Full', title: 'Complete code' },
-      { key: 'compressed', label: 'Min', title: 'Comments stripped, SVG simplified & whitespace compressed' },
-      { key: 'skeleton', label: 'Skel', title: 'Signatures & structure only' }
-    ];
-
-    if (entry.isDuplicateOf) {
-      modes.push({ key: 'duplicate', label: 'Dup', title: `Referenced duplicate of ${entry.isDuplicateOf}` });
-    }
-
-    modes.forEach(m => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `px-2 py-0.5 rounded mode-btn font-mono text-[11px] ${
-        entry.mode === m.key ? `active-${m.key}` : 'text-slate-400 hover:text-white'
-      }`;
-      btn.textContent = m.label;
-      btn.title = m.title;
-
-      btn.addEventListener('click', () => {
-        if (entry.mode === m.key) return;
-        entry.mode = m.key;
-        processFileEntry(entry);
-        tokenBadge.textContent = entry.mode === 'duplicate' ? `~5 tok (ref)` : `~${entry.tokens.toLocaleString()} tok`;
-
-        Array.from(modeGroup.children).forEach((b, idx) => {
-          b.className = `px-2 py-0.5 rounded mode-btn font-mono text-[11px] ${
-            modes[idx].key === m.key ? `active-${modes[idx].key}` : 'text-slate-400 hover:text-white'
-          }`;
-        });
-
-        updateBudgetDashboard();
-        // Recount via worker in background
-        runWorkerBatchTokenization();
+      // Chevron
+      const chevronBtn = document.createElement('button');
+      chevronBtn.type = 'button';
+      chevronBtn.className = `folder-chevron p-1 text-slate-400 hover:text-white transition-transform ${isCollapsed ? 'collapsed' : ''}`;
+      chevronBtn.title = isCollapsed ? 'Expand folder' : 'Collapse folder';
+      chevronBtn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      `;
+      chevronBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFolderCollapse(folderPath);
       });
 
-      modeGroup.appendChild(btn);
-    });
+      // Folder Tri-State Checkbox
+      const folderCheckbox = document.createElement('input');
+      folderCheckbox.type = 'checkbox';
+      folderCheckbox.checked = selState === 'all';
+      folderCheckbox.indeterminate = selState === 'partial';
+      folderCheckbox.className = 'folder-select-checkbox w-4 h-4 rounded text-blue-500 bg-slate-800 border-slate-600 focus:ring-blue-500 cursor-pointer';
+      folderCheckbox.title = `Toggle selection for all files in ${folderPath}`;
+      folderCheckbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        const shouldSelect = selState !== 'all';
+        setFolderSelection(folderPath, shouldSelect);
+      });
 
-    // Preview Button
-    const previewBtn = document.createElement('button');
-    previewBtn.type = 'button';
-    previewBtn.className = 'text-slate-400 hover:text-blue-400 p-1 transition-colors';
-    previewBtn.title = 'Preview transformed code';
-    previewBtn.innerHTML = `
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-      </svg>
-    `;
-    previewBtn.addEventListener('click', () => openPreviewModal(entry));
+      // Folder Icon + Name
+      const nameContainer = document.createElement('div');
+      nameContainer.className = 'flex items-center gap-1.5 cursor-pointer truncate';
+      nameContainer.addEventListener('click', () => toggleFolderCollapse(folderPath));
 
-    right.appendChild(tokenBadge);
-    right.appendChild(modeGroup);
-    right.appendChild(previewBtn);
+      const folderIcon = document.createElement('span');
+      folderIcon.className = 'text-amber-400 text-sm';
+      folderIcon.textContent = '📁';
 
-    row.appendChild(left);
-    row.appendChild(right);
-    fragment.appendChild(row);
-  });
+      const folderName = document.createElement('span');
+      folderName.className = 'font-mono text-xs font-bold text-slate-200 hover:text-blue-400 transition-colors truncate';
+      folderName.textContent = folderPath;
+
+      nameContainer.appendChild(folderIcon);
+      nameContainer.appendChild(folderName);
+
+      // Folder File Count Badge
+      const countBadge = document.createElement('span');
+      countBadge.className = 'folder-count-badge text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 shrink-0';
+      countBadge.textContent = `${selectedCount}/${folderEntries.length} files`;
+
+      // Folder Tokens Badge
+      const tokenBadge = document.createElement('span');
+      tokenBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/40 shrink-0';
+      tokenBadge.textContent = `~${folderTokens.toLocaleString()} tok`;
+
+      left.appendChild(chevronBtn);
+      left.appendChild(folderCheckbox);
+      left.appendChild(nameContainer);
+      left.appendChild(countBadge);
+      left.appendChild(tokenBadge);
+
+      // Right: Quick Mode Actions for the entire folder
+      const right = document.createElement('div');
+      right.className = 'flex items-center gap-1.5 shrink-0 self-end sm:self-auto';
+
+      const folderModeSpan = document.createElement('span');
+      folderModeSpan.className = 'text-[10px] font-mono text-slate-500 uppercase mr-1 hidden sm:inline';
+      folderModeSpan.textContent = 'Folder Mode:';
+      right.appendChild(folderModeSpan);
+
+      const fModes = [
+        { key: 'full', label: 'Full', title: `Set all files in ${folderPath} to Full` },
+        { key: 'compressed', label: 'Min', title: `Set all files in ${folderPath} to Compressed` },
+        { key: 'skeleton', label: 'Skel', title: `Set all files in ${folderPath} to Skeleton` }
+      ];
+
+      fModes.forEach(fm => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'px-1.5 py-0.5 rounded text-[10px] font-mono border border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:border-slate-500 transition-colors';
+        btn.textContent = fm.label;
+        btn.title = fm.title;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setFolderMode(folderPath, fm.key);
+        });
+        right.appendChild(btn);
+      });
+
+      header.appendChild(left);
+      header.appendChild(right);
+      groupDiv.appendChild(header);
+
+      // Children list
+      const childrenDiv = document.createElement('div');
+      childrenDiv.className = `folder-children p-2 space-y-1.5 ${isCollapsed ? 'hidden' : ''}`;
+
+      folderEntries.forEach(entry => {
+        childrenDiv.appendChild(createFileRowElement(entry));
+      });
+
+      groupDiv.appendChild(childrenDiv);
+      fragment.appendChild(groupDiv);
+    }
+  }
 
   fileList.appendChild(fragment);
 }
@@ -608,6 +913,7 @@ async function processScannedFiles(filesMap, folderName, gitignoreContent) {
   }
 
   renderFileList();
+  renderFolderPills();
   updateBudgetDashboard();
 
   if (selectionArea) {
@@ -634,6 +940,7 @@ function setAllFilesMode(mode) {
     processFileEntry(entry);
   }
   renderFileList();
+  renderFolderPills();
   updateBudgetDashboard();
   runWorkerBatchTokenization();
 }
@@ -926,7 +1233,62 @@ function initEvents() {
       }
       toggleAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
       renderFileList();
+      renderFolderPills();
       updateBudgetDashboard();
+    });
+  }
+
+  // Folder Quick-Filter Bar actions
+  if (selectAllFoldersBtn) {
+    selectAllFoldersBtn.addEventListener('click', () => {
+      for (const entry of state.files.values()) {
+        entry.selected = true;
+      }
+      if (toggleAllBtn) toggleAllBtn.textContent = 'Deselect All';
+      renderFileList();
+      renderFolderPills();
+      updateBudgetDashboard();
+    });
+  }
+
+  if (deselectAllFoldersBtn) {
+    deselectAllFoldersBtn.addEventListener('click', () => {
+      for (const entry of state.files.values()) {
+        entry.selected = false;
+      }
+      if (toggleAllBtn) toggleAllBtn.textContent = 'Select All';
+      renderFileList();
+      renderFolderPills();
+      updateBudgetDashboard();
+    });
+  }
+
+  // Expand / Collapse All Folders
+  if (expandAllFoldersBtn) {
+    expandAllFoldersBtn.addEventListener('click', () => {
+      state.collapsedFolders.clear();
+      renderFileList();
+    });
+  }
+
+  if (collapseAllFoldersBtn) {
+    collapseAllFoldersBtn.addEventListener('click', () => {
+      const folderMap = groupFilesByDirectory(Array.from(state.files.values()));
+      for (const folderPath of folderMap.keys()) {
+        state.collapsedFolders.add(folderPath);
+      }
+      renderFileList();
+    });
+  }
+
+  // View Mode toggle (Grouped vs Flat)
+  if (viewModeBtn) {
+    viewModeBtn.addEventListener('click', () => {
+      state.viewMode = state.viewMode === 'grouped' ? 'flat' : 'grouped';
+      viewModeBtn.innerHTML = state.viewMode === 'grouped'
+        ? '<span>📁 Grouped</span>'
+        : '<span>📄 Flat List</span>';
+      renderFileList();
     });
   }
 

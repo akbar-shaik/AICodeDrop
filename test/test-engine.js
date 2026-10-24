@@ -11,7 +11,10 @@ import {
   sanitizeSecrets,
   getExtension,
   computeContentHash,
-  isDefaultIgnoredDir
+  isDefaultIgnoredDir,
+  getFileDirectory,
+  groupFilesByDirectory,
+  getFolderSelectionState
 } from '../src/js/scanner.js';
 
 import {
@@ -163,6 +166,43 @@ test('Content-hash calculation detects identical duplicate files', () => {
   assert.strictEqual(hash1, hash2);
   assert.notStrictEqual(hash1, hash3);
   assert.strictEqual(hash1.length, 16);
+});
+
+test('Folder helper functions: getFileDirectory, groupFilesByDirectory, getFolderSelectionState', () => {
+  // getFileDirectory
+  assert.strictEqual(getFileDirectory('index.html'), '(root)');
+  assert.strictEqual(getFileDirectory('package.json'), '(root)');
+  assert.strictEqual(getFileDirectory('src/js/app.js'), 'src/js');
+  assert.strictEqual(getFileDirectory('src\\css\\styles.css'), 'src/css');
+  assert.strictEqual(getFileDirectory('nested/very/deeply/file.ts'), 'nested/very/deeply');
+
+  // groupFilesByDirectory
+  const mockFiles = [
+    { path: 'index.html', selected: true },
+    { path: 'package.json', selected: false },
+    { path: 'src/js/app.js', selected: true },
+    { path: 'src/js/scanner.js', selected: true },
+    { path: 'src/css/styles.css', selected: false }
+  ];
+
+  const grouped = groupFilesByDirectory(mockFiles);
+  assert.strictEqual(grouped.size, 3);
+  assert.ok(grouped.has('(root)'));
+  assert.ok(grouped.has('src/js'));
+  assert.ok(grouped.has('src/css'));
+  assert.strictEqual(grouped.get('(root)').length, 2);
+  assert.strictEqual(grouped.get('src/js').length, 2);
+  assert.strictEqual(grouped.get('src/css').length, 1);
+
+  // getFolderSelectionState
+  // All selected
+  assert.strictEqual(getFolderSelectionState(grouped.get('src/js')), 'all');
+  // None selected
+  assert.strictEqual(getFolderSelectionState(grouped.get('src/css')), 'none');
+  // Partial selected
+  assert.strictEqual(getFolderSelectionState(grouped.get('(root)')), 'partial');
+  // Empty array
+  assert.strictEqual(getFolderSelectionState([]), 'none');
 });
 
 // ==========================================

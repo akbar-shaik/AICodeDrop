@@ -82,3 +82,25 @@
 .toast-enter {
   animation: slideDownFade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Folder headers and tree styles */
+.folder-header {
+  user-select: none;
+}
+
+.folder-chevron {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.folder-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.folder-chip {
+  transition: all 0.15s ease-in-out;
+}
+
+.folder-chip:hover {
+  background-color: rgba(51, 65, 85, 0.8);
+}
+

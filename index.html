@@ -180,6 +180,10 @@
             <button id="bulkSkeletonBtn" type="button" class="px-2.5 py-1 rounded font-medium text-purple-300 hover:text-purple-200 hover:bg-purple-950/40">Skeleton</button>
           </div>
 
+          <button id="viewModeBtn" type="button" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors flex items-center gap-1.5" title="Toggle between Grouped by Folder and Flat List view">
+            <span>📁 Grouped</span>
+          </button>
+
           <button id="toggleAllBtn" type="button" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors">
             Deselect All
           </button>
@@ -208,13 +212,40 @@
         </div>
       </div>
 
+      <!-- Folder Quick-Filter / Selection Bar -->
+      <div id="folderFilterBar" class="hidden flex-col gap-2 p-3 bg-slate-900/70 border border-slate-800/80 rounded-xl text-xs shadow-lg">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5 text-slate-300 font-mono font-bold">
+            <span class="text-amber-400">📁</span>
+            <span>Folders:</span>
+            <span class="text-[11px] font-normal text-slate-400">(Click a folder to select / unselect all its files)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="selectAllFoldersBtn" type="button" class="text-blue-400 hover:underline font-mono text-[11px]">Select All</button>
+            <span class="text-slate-600">•</span>
+            <button id="deselectAllFoldersBtn" type="button" class="text-slate-400 hover:underline font-mono text-[11px]">Deselect All</button>
+          </div>
+        </div>
+        <div id="folderPillsContainer" class="flex flex-wrap items-center gap-1.5 pt-1">
+          <!-- Dynamically populated with folder chips -->
+        </div>
+      </div>
+
       <!-- Interactive File List -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
         <div class="p-3 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
-          <span>SOURCE FILES</span>
-          <span class="hidden sm:inline">MODE / TOKENS</span>
+          <div class="flex items-center gap-2">
+            <span>SOURCE FILES</span>
+            <span id="folderCountBadge" class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700"></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="expandAllFoldersBtn" type="button" class="text-[11px] text-blue-400 hover:underline">Expand All</button>
+            <span class="text-slate-600">•</span>
+            <button id="collapseAllFoldersBtn" type="button" class="text-[11px] text-slate-400 hover:underline">Collapse All</button>
+            <span class="hidden sm:inline ml-3">MODE / TOKENS</span>
+          </div>
         </div>
-        <div id="fileList" class="p-3 max-h-96 overflow-y-auto terminal-scroll space-y-1.5 bg-slate-950">
+        <div id="fileList" class="p-3 max-h-96 overflow-y-auto terminal-scroll space-y-2 bg-slate-950">
           <!-- Populated dynamically -->
         </div>
       </div>
