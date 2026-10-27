@@ -50,6 +50,10 @@ import {
   buildArchitectureMap
 } from './analyzer.js';
 
+import {
+  getPromptPreset
+} from './presets.js';
+
 // Application State
 const state = {
   folderName: 'project',
@@ -84,6 +88,8 @@ const copyBtn = document.getElementById('copyBtn');
 const telegramBtn = document.getElementById('telegramBtn');
 const customStart = document.getElementById('customStart');
 const customEnd = document.getElementById('customEnd');
+const promptPresetSelect = document.getElementById('promptPresetSelect');
+const promptPresetDesc = document.getElementById('promptPresetDesc');
 
 // Folder Selection & Grouping Controls
 const viewModeBtn = document.getElementById('viewModeBtn');
@@ -1331,8 +1337,43 @@ function initEvents() {
   }
 
   // Prompts inputs live update overhead
-  if (customStart) customStart.addEventListener('input', () => updateBudgetDashboard());
-  if (customEnd) customEnd.addEventListener('input', () => updateBudgetDashboard());
+  if (customStart) {
+    customStart.addEventListener('input', () => {
+      if (promptPresetSelect && promptPresetSelect.value !== 'custom') {
+        promptPresetSelect.value = 'custom';
+        if (promptPresetDesc) promptPresetDesc.textContent = 'Custom prompt';
+      }
+      updateBudgetDashboard();
+    });
+  }
+
+  if (customEnd) {
+    customEnd.addEventListener('input', () => {
+      if (promptPresetSelect && promptPresetSelect.value !== 'custom') {
+        promptPresetSelect.value = 'custom';
+        if (promptPresetDesc) promptPresetDesc.textContent = 'Custom prompt';
+      }
+      updateBudgetDashboard();
+    });
+  }
+
+  // Prompt Preset Selector
+  if (promptPresetSelect) {
+    promptPresetSelect.addEventListener('change', (e) => {
+      const presetId = e.target.value;
+      const preset = getPromptPreset(presetId);
+      if (preset) {
+        if (customStart) customStart.value = preset.prefix || '';
+        if (customEnd) customEnd.value = preset.suffix || '';
+        if (promptPresetDesc) {
+          promptPresetDesc.textContent = preset.description || '';
+          promptPresetDesc.title = preset.description || '';
+        }
+        updateBudgetDashboard();
+        log(`Applied prompt preset: "${preset.name}"`, 'engine');
+      }
+    });
+  }
 
   // Actions
   if (generateBtn) generateBtn.addEventListener('click', downloadContextFile);

@@ -53,6 +53,7 @@ import {
 } from '../src/js/tokenizer.js';
 
 import { handler as telegramBackupHandler } from '../netlify/functions/telegram-backup.js';
+import { PROMPT_PRESETS, getPromptPreset } from '../src/js/presets.js';
 
 console.log('🧪 Starting AICodeDrop v2.5 Test Suite...\n');
 
@@ -558,6 +559,53 @@ await testAsync('Missing fileContent returns 400 Bad Request', async () => {
   assert.strictEqual(res.statusCode, 400);
   const json = JSON.parse(res.body);
   assert.ok(json.error.includes('Missing required field: fileContent'));
+});
+
+// ==========================================
+// 7. Prompt Presets Verification
+// ==========================================
+console.log('\n--- 7. System & Task Prompt Presets ---');
+
+test('Prompt presets contain unique IDs and required prompt fields', () => {
+  assert.ok(Array.isArray(PROMPT_PRESETS));
+  assert.strictEqual(PROMPT_PRESETS.length, 7);
+
+  const ids = new Set();
+  for (const preset of PROMPT_PRESETS) {
+    assert.ok(preset.id && typeof preset.id === 'string');
+    assert.ok(preset.name && typeof preset.name === 'string');
+    assert.ok(typeof preset.prefix === 'string');
+    assert.ok(typeof preset.suffix === 'string');
+    assert.ok(!ids.has(preset.id), `Duplicate preset ID: ${preset.id}`);
+    ids.add(preset.id);
+  }
+
+  assert.ok(ids.has('default'));
+  assert.ok(ids.has('prod_audit'));
+  assert.ok(ids.has('flash_plan'));
+  assert.ok(ids.has('argon_architect'));
+  assert.ok(ids.has('greenfield_plan'));
+  assert.ok(ids.has('code_auditor'));
+  assert.ok(ids.has('custom'));
+});
+
+test('getPromptPreset returns target preset or falls back to default', () => {
+  const prodAudit = getPromptPreset('prod_audit');
+  assert.strictEqual(prodAudit.id, 'prod_audit');
+  assert.ok(prodAudit.prefix.includes('production-safe'));
+  assert.ok(prodAudit.prefix.includes('Strict Production Safety Directives'));
+
+  const flashPlan = getPromptPreset('flash_plan');
+  assert.strictEqual(flashPlan.id, 'flash_plan');
+  assert.ok(flashPlan.prefix.includes('Gemini Flash 3.8'));
+
+  const codeAuditor = getPromptPreset('code_auditor');
+  assert.strictEqual(codeAuditor.id, 'code_auditor');
+  assert.ok(codeAuditor.prefix.includes('frontier-level code auditor'));
+
+  // Fallback to default
+  const unknown = getPromptPreset('non_existent_preset');
+  assert.strictEqual(unknown.id, 'default');
 });
 
 console.log(`\n==========================================`);

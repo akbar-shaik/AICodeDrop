@@ -251,23 +251,46 @@
       </div>
 
       <!-- Prompts Customization -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
-          <label class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-            User Instructions / System Context (Prefix)
-          </label>
-          <textarea id="customStart" rows="4" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y">I am working on a project and am providing the current codebase below for your complete review.
+      <div class="space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 shadow-lg">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-amber-400">⚡</span>
+            <label for="promptPresetSelect" class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+              Prompt Preset:
+            </label>
+            <select id="promptPresetSelect" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-mono focus:outline-none focus:border-blue-500 cursor-pointer">
+              <option value="default">Default: Expert Pair Programmer & Architect</option>
+              <option value="prod_audit">Production-Readiness Audit & Strict Safe Fixes</option>
+              <option value="flash_plan">Gemini Flash 3.8: Implementation Plan (Existing Project)</option>
+              <option value="argon_architect">Argon 4 Budget-Optimized Architecture Plan (Flash 3.8 High)</option>
+              <option value="greenfield_plan">Greenfield Architecture & Scaffolding Plan (Flash 3.8 High)</option>
+              <option value="code_auditor">Frontier Code Auditor & Defect Trace</option>
+              <option value="custom">Custom (Blank / Clear Slate)</option>
+            </select>
+          </div>
+          <span id="promptPresetDesc" class="text-[11px] text-slate-400 font-mono truncate max-w-md hidden md:inline" title="General purpose codebase comprehension and architectural collaboration">
+            General purpose codebase comprehension and architectural collaboration
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
+            <label class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+              User Instructions / System Context (Prefix)
+            </label>
+            <textarea id="customStart" rows="4" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y">I am working on a project and am providing the current codebase below for your complete review.
 
 Please act as my expert pair programmer and architect. Carefully analyze the codebase structure, logic, dependencies, and objectives.
 
 Summarize your understanding and ask any clarifying questions about next steps.</textarea>
-        </div>
+          </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
-          <label class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-            Specific Task / Goal (Suffix)
-          </label>
-          <textarea id="customEnd" rows="4" placeholder="e.g. Based on the code above, help me implement..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y"></textarea>
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
+            <label class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+              Specific Task / Goal (Suffix)
+            </label>
+            <textarea id="customEnd" rows="4" placeholder="e.g. Based on the code above, help me implement..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y">Based on the codebase provided above, help me with the following task:</textarea>
+          </div>
         </div>
       </div>
 
