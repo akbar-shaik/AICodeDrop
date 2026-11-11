@@ -250,46 +250,201 @@
         </div>
       </div>
 
-      <!-- Prompts Customization -->
-      <div class="space-y-3">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-2.5 shadow-lg">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-amber-400">⚡</span>
-            <label for="promptPresetSelect" class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-              Prompt Preset:
-            </label>
-            <select id="promptPresetSelect" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-mono focus:outline-none focus:border-blue-500 cursor-pointer">
-              <option value="default">Default: Expert Pair Programmer & Architect</option>
-              <option value="prod_audit">Production-Readiness Audit & Strict Safe Fixes</option>
-              <option value="flash_plan">Gemini Flash 3.8: Implementation Plan (Existing Project)</option>
-              <option value="argon_architect">Argon 4 Budget-Optimized Architecture Plan (Flash 3.8 High)</option>
-              <option value="greenfield_plan">Greenfield Architecture & Scaffolding Plan (Flash 3.8 High)</option>
-              <option value="code_auditor">Frontier Code Auditor & Defect Trace</option>
-              <option value="custom">Custom (Blank / Clear Slate)</option>
-            </select>
+      <!-- Prompts Customization (PromptShelf Library Integration) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <!-- Top Header: Title + Search + Actions -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-sm">
+              ✦
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-bold text-white tracking-tight">PromptShelf Studio</h3>
+                <span id="promptTotalCountBadge" class="text-[10px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-1.5 py-0.5 rounded">54+ Prompts</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Step 1: Pick a Main Category • Step 2: Choose a Sub-Category Prompt &amp; Preview</p>
+            </div>
           </div>
-          <span id="promptPresetDesc" class="text-[11px] text-slate-400 font-mono truncate max-w-md hidden md:inline" title="General purpose codebase comprehension and architectural collaboration">
-            General purpose codebase comprehension and architectural collaboration
-          </span>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Quick Search -->
+            <div class="relative w-full sm:w-56">
+              <input
+                type="search"
+                id="promptSearchInput"
+                placeholder="Search 54+ prompts (e.g. audit, API)..."
+                class="w-full pl-3 pr-7 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+              />
+            </div>
+
+            <!-- Export / Import Backup -->
+            <button
+              id="exportPromptsBtn"
+              type="button"
+              title="Export custom prompts and favorites as JSON"
+              class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-mono transition-colors"
+            >
+              ⇩ Export
+            </button>
+            <button
+              id="importPromptsBtn"
+              type="button"
+              title="Import custom prompts and favorites from JSON"
+              class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-mono transition-colors"
+            >
+              ⇧ Import
+            </button>
+            <input type="file" id="importPromptInput" accept=".json,application/json" class="hidden" />
+
+            <button
+              id="openCustomPromptModalBtn"
+              type="button"
+              class="px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-mono font-semibold transition-colors"
+            >
+              ＋ New Prompt
+            </button>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
-            <label class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-              User Instructions / System Context (Prefix)
+        <!-- STEP 1: Main Category Quick Pills -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span class="uppercase tracking-wider font-bold text-slate-300">1. Main Category</span>
+            <span id="activeCategoryCountLabel" class="text-slate-500">8 collections</span>
+          </div>
+          <div id="promptCategoryPills" class="flex flex-wrap items-center gap-1.5">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+
+        <!-- STEP 1 & STEP 2 Cascading Dropdowns + Favorite / Preview Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-1">
+          <!-- Main Category Select (4 cols) -->
+          <div class="md:col-span-4 space-y-1">
+            <label for="promptCategorySelect" class="block text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Main Category
             </label>
-            <textarea id="customStart" rows="4" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y">I am working on a project and am providing the current codebase below for your complete review.
-
-Please act as my expert pair programmer and architect. Carefully analyze the codebase structure, logic, dependencies, and objectives.
-
-Summarize your understanding and ask any clarifying questions about next steps.</textarea>
+            <select
+              id="promptCategorySelect"
+              class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <!-- Populated dynamically -->
+            </select>
           </div>
 
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-2">
-            <label class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-              Specific Task / Goal (Suffix)
-            </label>
-            <textarea id="customEnd" rows="4" placeholder="e.g. Based on the code above, help me implement..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y">Based on the codebase provided above, help me with the following task:</textarea>
+          <!-- Sub-Category / Specific Prompt Select (8 cols) -->
+          <div class="md:col-span-8 space-y-1">
+            <div class="flex items-center justify-between">
+              <label for="promptPresetSelect" class="block text-[11px] font-mono uppercase tracking-wider text-slate-400">
+                2. Sub-Category Prompt Template
+              </label>
+              <span id="promptPresetDesc" class="text-[11px] text-indigo-300 font-mono truncate max-w-xs"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <select
+                id="promptPresetSelect"
+                class="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <!-- Populated dynamically based on Main Category -->
+              </select>
+
+              <button
+                id="favPromptBtn"
+                type="button"
+                title="Save to Favorites"
+                class="px-2.5 py-2 rounded-xl border border-slate-700 bg-slate-950 hover:border-amber-500/50 text-slate-400 hover:text-amber-400 text-sm transition-colors"
+              >
+                ☆
+              </button>
+
+              <button
+                id="togglePromptPreviewBtn"
+                type="button"
+                class="px-3 py-2 rounded-xl border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-mono font-semibold transition-colors shrink-0"
+              >
+                👁 Preview
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Live Prompt Preview & Smart Placeholder Quick-Fill Card -->
+        <div id="promptPreviewPanel" class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="previewCategoryBadge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                Prompt Engineering
+              </span>
+              <span id="previewKindBadge" class="text-[11px] font-mono text-slate-400">Core framework</span>
+              <div id="previewTagsContainer" class="flex items-center gap-1 flex-wrap"></div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-[11px] font-mono text-slate-400">Placement:</label>
+              <select
+                id="promptPlacementMode"
+                class="bg-slate-900 border border-slate-700 text-slate-200 text-[11px] rounded-lg px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
+              >
+                <option value="split">Smart Split (Framework → Prefix, Task → Suffix)</option>
+                <option value="prefix">Full Prompt in Prefix Only</option>
+                <option value="suffix">Full Prompt in Suffix Only</option>
+              </select>
+            </div>
+          </div>
+
+          <p id="previewFullDesc" class="text-xs text-slate-300 leading-relaxed"></p>
+
+          <!-- Dynamic Bracketed Placeholders Form (Auto-shown when prompt has [PLACEHOLDERS]) -->
+          <div id="placeholderVariablesBox" class="hidden pt-2 border-t border-slate-800/80 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+                ⚡ Quick-Fill Prompt Variables (Auto-updates Prefix &amp; Suffix)
+              </span>
+              <div class="flex items-center gap-3">
+                <button id="autoFillVariablesBtn" type="button" class="text-[11px] font-mono text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1">
+                  ⚡ Auto-Fill from Scanned Repo
+                </button>
+                <button id="resetPlaceholdersBtn" type="button" class="text-[11px] font-mono text-slate-400 hover:text-white underline">
+                  Reset Variables
+                </button>
+              </div>
+            </div>
+            <div id="placeholderInputsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <!-- Populated dynamically for each [PLACEHOLDER] -->
+            </div>
+          </div>
+
+          <!-- Raw Prompt Collapsible Code Preview -->
+          <div id="rawPromptPreviewWrap" class="hidden pt-2 border-t border-slate-800/80 space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
+              <span>TEMPLATE PREVIEW (READ-ONLY)</span>
+              <button id="copyRawPromptBtn" type="button" class="text-blue-400 hover:underline">Copy Raw Template</button>
+            </div>
+            <pre id="rawPromptPreviewText" class="max-h-56 overflow-y-auto terminal-scroll p-3 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed"></pre>
+          </div>
+        </div>
+
+        <!-- Editable Output Textareas (Prefix & Suffix) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div class="bg-slate-950/60 border border-slate-800/90 rounded-xl p-3.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="customStart" class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+                User Instructions / System Context (Prefix)
+              </label>
+              <span class="text-[10px] font-mono text-slate-500">&lt;user_instructions&gt;</span>
+            </div>
+            <textarea id="customStart" rows="6" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y"></textarea>
+          </div>
+
+          <div class="bg-slate-950/60 border border-slate-800/90 rounded-xl p-3.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="customEnd" class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+                Specific Task / Goal (Suffix)
+              </label>
+              <span class="text-[10px] font-mono text-slate-500">&lt;user_prompt&gt;</span>
+            </div>
+            <textarea id="customEnd" rows="6" placeholder="e.g. Based on the code above, help me implement..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y"></textarea>
           </div>
         </div>
       </div>
@@ -341,6 +496,47 @@ Summarize your understanding and ask any clarifying questions about next steps.<
       <div class="p-4 flex-1 overflow-y-auto terminal-scroll bg-slate-950">
         <pre id="previewCode" class="font-code text-xs text-slate-300 whitespace-pre leading-relaxed"></pre>
       </div>
+    </div>
+  </div>
+
+  <!-- Create Custom Prompt Modal -->
+  <div id="customPromptModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <span class="font-mono text-sm font-bold text-white">＋ Create Reusable Prompt</span>
+        <button id="closeCustomPromptModalBtn" type="button" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">✕</button>
+      </div>
+      <form id="customPromptForm" class="p-5 space-y-3 text-xs">
+        <div>
+          <label class="block font-mono text-slate-300 mb-1">Prompt Title</label>
+          <input id="newPromptTitle" type="text" required maxlength="70" placeholder="e.g. ServiceNow CMDB Graph Audit" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="block font-mono text-slate-300 mb-1">Main Category</label>
+          <select id="newPromptCategory" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-blue-500">
+            <option value="Prompt Engineering">Prompt Engineering</option>
+            <option value="Production Safety">Production Safety</option>
+            <option value="Planning & Architecture">Planning & Architecture</option>
+            <option value="Code Quality">Code Quality</option>
+            <option value="Testing & QA">Testing & QA</option>
+            <option value="Security & Performance">Security & Performance</option>
+            <option value="DevOps & Reliability">DevOps & Reliability</option>
+            <option value="Research & Documentation">Research & Documentation</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-mono text-slate-300 mb-1">Short Description</label>
+          <input id="newPromptDesc" type="text" required maxlength="150" placeholder="What does this prompt accomplish?" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="block font-mono text-slate-300 mb-1">Prompt Content (Use [PLACEHOLDER] for variables)</label>
+          <textarea id="newPromptBody" rows="6" required placeholder="Write your reusable prompt here..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-slate-200 font-mono focus:outline-none focus:border-blue-500"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" id="cancelCustomPromptBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-mono">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono font-bold">Save Prompt</button>
+        </div>
+      </form>
     </div>
   </div>
 

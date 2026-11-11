@@ -53,7 +53,18 @@ import {
 } from '../src/js/tokenizer.js';
 
 import { handler as telegramBackupHandler } from '../netlify/functions/telegram-backup.js';
-import { PROMPT_PRESETS, getPromptPreset } from '../src/js/presets.js';
+import {
+  PROMPT_PRESETS,
+  getPromptPreset,
+  PROMPT_CATEGORIES,
+  PROMPT_LIBRARY,
+  getClassicPresetsAsLibraryItems,
+  filterPrompts,
+  getLibraryPromptById,
+  extractPromptPlaceholders,
+  splitPromptIntoPrefixSuffix,
+  autoFillPlaceholdersFromRepo
+} from '../src/js/presets.js';
 
 console.log('🧪 Starting AICodeDrop v2.5 Test Suite...\n');
 
@@ -606,6 +617,95 @@ test('getPromptPreset returns target preset or falls back to default', () => {
   // Fallback to default
   const unknown = getPromptPreset('non_existent_preset');
   assert.strictEqual(unknown.id, 'default');
+});
+
+// ==========================================
+// 8. PromptShelf Studio & 54+ Library Tests
+// ==========================================
+console.log('\n--- 8. PromptShelf Studio & Library Data Layer ---');
+
+test('Prompt categories and library counts match PromptShelf specifications', () => {
+  assert.ok(Array.isArray(PROMPT_CATEGORIES));
+  assert.ok(PROMPT_CATEGORIES.length >= 8);
+  assert.ok(Array.isArray(PROMPT_LIBRARY));
+  assert.strictEqual(PROMPT_LIBRARY.length, 54);
+
+  // Check unique IDs across all 54 prompts
+  const idSet = new Set();
+  for (const p of PROMPT_LIBRARY) {
+    assert.ok(p.id && typeof p.id === 'string');
+    assert.ok(p.title && typeof p.title === 'string');
+    assert.ok(p.category && typeof p.category === 'string');
+    assert.ok(p.description && typeof p.description === 'string');
+    assert.ok(p.prompt && typeof p.prompt === 'string');
+    assert.ok(!idSet.has(p.id), `Duplicate prompt ID in library: ${p.id}`);
+    idSet.add(p.id);
+  }
+});
+
+test('filterPrompts accurately filters by category and search queries', () => {
+  const prodSafety = filterPrompts({ category: 'Production Safety' });
+  assert.strictEqual(prodSafety.length, 3);
+
+  const planArch = filterPrompts({ category: 'Planning & Architecture' });
+  assert.strictEqual(planArch.length, 14);
+
+  const codeQuality = filterPrompts({ category: 'Code Quality' });
+  assert.strictEqual(codeQuality.length, 7);
+
+  // Search filter
+  const searchResults = filterPrompts({ search: 'audit' });
+  assert.ok(searchResults.length >= 2);
+  for (const item of searchResults) {
+    const text = [item.title, item.description, item.category, item.kind, ...(item.tags || []), item.prompt].join(' ').toLowerCase();
+    assert.ok(text.includes('audit'));
+  }
+
+  // Favorites filter
+  const favSet = new Set(['master-architect', 'production-readiness']);
+  const favList = filterPrompts({ category: 'favorites', favorites: favSet });
+  assert.strictEqual(favList.length, 2);
+
+  // Classic presets filter
+  const classicList = filterPrompts({ category: 'classic' });
+  assert.strictEqual(classicList.length, 7);
+});
+
+test('extractPromptPlaceholders extracts bracketed uppercase variables correctly', () => {
+  const sample = 'Please review [TARGET FILES] using [ARCHITECTURE / STACK] under [CONSTRAINTS]. Ignore [1] or [markdown link](url).';
+  const placeholders = extractPromptPlaceholders(sample);
+  assert.deepStrictEqual(placeholders, ['TARGET FILES', 'ARCHITECTURE / STACK', 'CONSTRAINTS']);
+});
+
+test('splitPromptIntoPrefixSuffix correctly applies variable replacements', () => {
+  const promptObj = {
+    id: 'test-prompt',
+    title: 'Test Refactor',
+    prompt: 'Analyze [FILES] for [GOAL].'
+  };
+
+  const split = splitPromptIntoPrefixSuffix(promptObj, {
+    'FILES': 'src/js/app.js',
+    'GOAL': 'zero regressions'
+  });
+
+  assert.ok(split.prefix.includes('Analyze src/js/app.js for zero regressions.'));
+  assert.ok(split.suffix.includes('Execute the "Test Refactor" instructions above'));
+  assert.ok(split.suffix.includes('- FILES: src/js/app.js'));
+  assert.ok(split.suffix.includes('- GOAL: zero regressions'));
+});
+
+test('autoFillPlaceholdersFromRepo extracts repository context into placeholders', () => {
+  const placeholders = ['REPOSITORY NAME', 'STACK', 'TARGET FILES'];
+  const filled = autoFillPlaceholdersFromRepo(placeholders, {
+    folderName: 'AICodeDrop',
+    selectedFiles: ['src/js/app.js', 'src/js/presets.js', 'index.html'],
+    manifestSummary: 'Vanilla ES6 / Netlify Serverless SPA'
+  });
+
+  assert.strictEqual(filled['REPOSITORY NAME'], 'AICodeDrop');
+  assert.strictEqual(filled['STACK'], 'Vanilla ES6 / Netlify Serverless SPA');
+  assert.ok(filled['TARGET FILES'].includes('src/js/app.js'));
 });
 
 console.log(`\n==========================================`);

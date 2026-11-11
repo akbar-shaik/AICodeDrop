@@ -51,7 +51,14 @@ import {
 } from './analyzer.js';
 
 import {
-  getPromptPreset
+  getPromptPreset,
+  PROMPT_CATEGORIES,
+  PROMPT_LIBRARY,
+  filterPrompts,
+  getLibraryPromptById,
+  extractPromptPlaceholders,
+  splitPromptIntoPrefixSuffix,
+  autoFillPlaceholdersFromRepo
 } from './presets.js';
 
 // Application State
@@ -71,7 +78,17 @@ const state = {
   activePreviewFile: null,
   isWorkerTokenizing: false,
   viewMode: 'grouped', // 'grouped' | 'flat'
-  collapsedFolders: new Set()
+  collapsedFolders: new Set(),
+  promptLibrary: {
+    selectedCategory: 'Planning & Architecture',
+    selectedPromptId: 'existing-project-plan',
+    searchQuery: '',
+    placementMode: 'split', // 'split' | 'prefix' | 'suffix'
+    showRawPreview: false,
+    placeholderValues: {},
+    favorites: new Set(JSON.parse(localStorage.getItem('promptshelf_favorites') || '[]')),
+    customPrompts: JSON.parse(localStorage.getItem('promptshelf_custom') || '[]')
+  }
 };
 
 // DOM Elements
@@ -856,6 +873,307 @@ function closePreviewModal() {
 }
 
 /**
+ * ==========================================
+ * PromptShelf Studio Controller & Logic
+ * ==========================================
+ */
+
+/**
+ * Renders PromptShelf Category pills and synchronized category dropdown
+ */
+function renderPromptCategories() {
+  const pillsContainer = document.getElementById('promptCategoryPills');
+  const catSelect = document.getElementById('promptCategorySelect');
+  const totalBadge = document.getElementById('promptTotalCountBadge');
+  if (!pillsContainer || !catSelect) return;
+
+  const { selectedCategory, favorites, customPrompts } = state.promptLibrary;
+  const totalCount = PROMPT_LIBRARY.length + customPrompts.length;
+  if (totalBadge) totalBadge.textContent = `${totalCount}+ Prompts`;
+
+  const getCount = (catId) => filterPrompts({
+    category: catId,
+    favorites,
+    customPrompts
+  }).length;
+
+  // Render Category Pills
+  pillsContainer.innerHTML = PROMPT_CATEGORIES.map(c => {
+    const count = getCount(c.id);
+    const isActive = selectedCategory === c.id;
+    return `
+      <button
+        type="button"
+        data-cat-id="${c.id}"
+        class="prompt-cat-pill px-2.5 py-1 rounded-lg border border-slate-700/80 bg-slate-950/80 text-slate-300 hover:text-white text-[11px] font-mono inline-flex items-center gap-1.5 ${isActive ? 'active' : ''}"
+        title="View ${c.name} (${count} prompts)"
+      >
+        <span>${c.icon}</span>
+        <span>${c.name}</span>
+        <span class="text-[10px] text-slate-500">(${count})</span>
+      </button>
+    `;
+  }).join('');
+
+  pillsContainer.querySelectorAll('[data-cat-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const catId = btn.getAttribute('data-cat-id');
+      state.promptLibrary.selectedCategory = catId;
+      renderPromptCategories();
+      renderSubCategoryPrompts();
+    });
+  });
+
+  // Render Category Select Dropdown
+  catSelect.innerHTML = PROMPT_CATEGORIES.map(c => {
+    const count = getCount(c.id);
+    return `<option value="${c.id}" ${selectedCategory === c.id ? 'selected' : ''}>${c.icon} ${c.name} (${count})</option>`;
+  }).join('');
+}
+
+/**
+ * Filters and populates prompt templates based on active category and search
+ */
+function renderSubCategoryPrompts() {
+  const presetSelect = document.getElementById('promptPresetSelect');
+  const countLabel = document.getElementById('activeCategoryCountLabel');
+  if (!presetSelect) return;
+
+  const { selectedCategory, searchQuery, favorites, customPrompts } = state.promptLibrary;
+  const list = filterPrompts({
+    category: selectedCategory,
+    search: searchQuery,
+    favorites,
+    customPrompts
+  });
+
+  if (countLabel) {
+    countLabel.textContent = `${list.length} prompt${list.length === 1 ? '' : 's'} available`;
+  }
+
+  if (list.length === 0) {
+    presetSelect.innerHTML = `<option value="">No prompts match current filter</option>`;
+    const previewDesc = document.getElementById('previewFullDesc');
+    if (previewDesc) previewDesc.textContent = 'No matching prompts found. Try a different search term or category.';
+    return;
+  }
+
+  // Ensure selectedPromptId is valid inside current filtered list
+  if (!list.some(p => p.id === state.promptLibrary.selectedPromptId)) {
+    state.promptLibrary.selectedPromptId = list[0].id;
+    state.promptLibrary.placeholderValues = {};
+  }
+
+  presetSelect.innerHTML = list.map(p => {
+    const star = favorites.has(p.id) ? '★ ' : '';
+    const kind = p.kind ? `[${p.kind}] ` : '';
+    return `<option value="${p.id}" ${p.id === state.promptLibrary.selectedPromptId ? 'selected' : ''}>${star}${kind}${p.title}</option>`;
+  }).join('');
+
+  applySelectedPromptToWorkspace();
+}
+
+/**
+ * Applies selected prompt to preview panel and textareas
+ */
+function applySelectedPromptToWorkspace() {
+  const { selectedPromptId, customPrompts, favorites } = state.promptLibrary;
+  const promptObj = getLibraryPromptById(selectedPromptId, customPrompts);
+  if (!promptObj) return;
+
+  // Badges & description
+  const catBadge = document.getElementById('previewCategoryBadge');
+  const kindBadge = document.getElementById('previewKindBadge');
+  const fullDesc = document.getElementById('previewFullDesc');
+  const shortDesc = document.getElementById('promptPresetDesc');
+  const tagsWrap = document.getElementById('previewTagsContainer');
+  const rawPreview = document.getElementById('rawPromptPreviewText');
+  const favBtn = document.getElementById('favPromptBtn');
+
+  if (catBadge) catBadge.textContent = promptObj.category || 'Prompt';
+  if (kindBadge) kindBadge.textContent = promptObj.kind || 'Template';
+  if (fullDesc) fullDesc.textContent = promptObj.description || '';
+  if (shortDesc) {
+    shortDesc.textContent = promptObj.description || '';
+    shortDesc.title = promptObj.description || '';
+  }
+  if (favBtn) {
+    const isFav = favorites.has(promptObj.id);
+    favBtn.textContent = isFav ? '★' : '☆';
+    favBtn.classList.toggle('text-amber-400', isFav);
+  }
+  if (tagsWrap) {
+    tagsWrap.innerHTML = (promptObj.tags || []).map(t =>
+      `<span class="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400">${t}</span>`
+    ).join('');
+  }
+  if (rawPreview) {
+    rawPreview.textContent = promptObj.prompt || `${promptObj.prefix || ''}\n\n${promptObj.suffix || ''}`.trim();
+  }
+
+  // Render dynamic placeholder variables
+  renderPlaceholderInputs(promptObj);
+
+  // Sync to customStart and customEnd textareas
+  syncPromptTextareas(promptObj);
+}
+
+/**
+ * Renders interactive inputs for [BRACKETED_PLACEHOLDERS]
+ */
+function renderPlaceholderInputs(promptObj) {
+  const box = document.getElementById('placeholderVariablesBox');
+  const grid = document.getElementById('placeholderInputsGrid');
+  if (!box || !grid) return;
+
+  const fullPromptText = promptObj.prompt || `${promptObj.prefix || ''}\n\n${promptObj.suffix || ''}`;
+  const placeholders = extractPromptPlaceholders(fullPromptText);
+
+  if (placeholders.length === 0) {
+    box.classList.add('hidden');
+    grid.innerHTML = '';
+    return;
+  }
+
+  box.classList.remove('hidden');
+  grid.innerHTML = placeholders.map(ph => {
+    const currentVal = (state.promptLibrary.placeholderValues[ph] || '').replace(/"/g, '&quot;');
+    return `
+      <div>
+        <label class="block text-[10px] font-mono text-slate-400 mb-1">[${ph}]</label>
+        <input
+          type="text"
+          data-placeholder-key="${ph}"
+          value="${currentVal}"
+          placeholder="Enter ${ph.toLowerCase()}..."
+          class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500"
+        />
+      </div>
+    `;
+  }).join('');
+
+  grid.querySelectorAll('[data-placeholder-key]').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const key = e.target.getAttribute('data-placeholder-key');
+      state.promptLibrary.placeholderValues[key] = e.target.value;
+      syncPromptTextareas(promptObj);
+    });
+  });
+}
+
+/**
+ * Synchronizes Prefix (customStart) and Suffix (customEnd) textareas with variable replacements
+ */
+function syncPromptTextareas(promptObj) {
+  const { placementMode, placeholderValues } = state.promptLibrary;
+  const { prefix, suffix } = splitPromptIntoPrefixSuffix(promptObj, placeholderValues);
+
+  if (customStart && customEnd) {
+    if (placementMode === 'prefix') {
+      customStart.value = `${prefix}\n\n${suffix}`.trim();
+      customEnd.value = '';
+    } else if (placementMode === 'suffix') {
+      customStart.value = '';
+      customEnd.value = `${prefix}\n\n${suffix}`.trim();
+    } else {
+      customStart.value = prefix;
+      customEnd.value = suffix;
+    }
+  }
+  updateBudgetDashboard();
+}
+
+/**
+ * Auto-fills prompt variables from scanned repository context
+ */
+function handleAutoFillPlaceholders() {
+  const { selectedPromptId, customPrompts } = state.promptLibrary;
+  const promptObj = getLibraryPromptById(selectedPromptId, customPrompts);
+  if (!promptObj) return;
+
+  const fullPromptText = promptObj.prompt || `${promptObj.prefix || ''}\n\n${promptObj.suffix || ''}`;
+  const placeholders = extractPromptPlaceholders(fullPromptText);
+  if (placeholders.length === 0) return;
+
+  const selectedFiles = Array.from(state.files.values())
+    .filter(e => e.selected)
+    .map(e => e.path);
+
+  const manifestSummaries = extractManifestSummary(state.manifestMap);
+  const manifestSummary = manifestSummaries.map(m => m.summary).join('\n');
+
+  const filled = autoFillPlaceholdersFromRepo(placeholders, {
+    folderName: state.folderName,
+    selectedFiles,
+    manifestSummary
+  });
+
+  let filledCount = 0;
+  for (const [key, val] of Object.entries(filled)) {
+    if (val) {
+      state.promptLibrary.placeholderValues[key] = val;
+      filledCount++;
+    }
+  }
+
+  renderPlaceholderInputs(promptObj);
+  syncPromptTextareas(promptObj);
+  log(`Auto-filled ${filledCount} prompt variable(s) from scanned repo context`, 'success');
+}
+
+/**
+ * Exports custom prompts and favorites as JSON backup
+ */
+function exportPromptsBackup() {
+  const { customPrompts, favorites } = state.promptLibrary;
+  const payload = {
+    version: '2.5.0',
+    exportedAt: new Date().toISOString(),
+    customPrompts,
+    favoriteIds: Array.from(favorites)
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'promptshelf-backup.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  log('Exported PromptShelf backup (promptshelf-backup.json)', 'success');
+}
+
+/**
+ * Imports custom prompts and favorites from JSON backup
+ */
+function importPromptsBackup(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (Array.isArray(data.customPrompts)) {
+        state.promptLibrary.customPrompts = data.customPrompts;
+        localStorage.setItem('promptshelf_custom', JSON.stringify(data.customPrompts));
+      }
+      if (Array.isArray(data.favoriteIds)) {
+        state.promptLibrary.favorites = new Set(data.favoriteIds);
+        localStorage.setItem('promptshelf_favorites', JSON.stringify(data.favoriteIds));
+      }
+      renderPromptCategories();
+      renderSubCategoryPrompts();
+      log(`Imported backup: ${data.customPrompts?.length || 0} custom prompts, ${data.favoriteIds?.length || 0} favorites`, 'success');
+    } catch (err) {
+      log(`Failed to import prompts JSON: ${err.message}`, 'error');
+      alert(`Invalid prompt backup JSON: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/**
  * Handles loaded files map from scanner
  */
 async function processScannedFiles(filesMap, folderName, gitignoreContent) {
@@ -1337,43 +1655,189 @@ function initEvents() {
   }
 
   // Prompts inputs live update overhead
-  if (customStart) {
-    customStart.addEventListener('input', () => {
-      if (promptPresetSelect && promptPresetSelect.value !== 'custom') {
-        promptPresetSelect.value = 'custom';
-        if (promptPresetDesc) promptPresetDesc.textContent = 'Custom prompt';
-      }
-      updateBudgetDashboard();
+  if (customStart) customStart.addEventListener('input', () => updateBudgetDashboard());
+  if (customEnd) customEnd.addEventListener('input', () => updateBudgetDashboard());
+
+  // PromptShelf Studio Event Bindings
+  const promptCategorySelect = document.getElementById('promptCategorySelect');
+  if (promptCategorySelect) {
+    promptCategorySelect.addEventListener('change', (e) => {
+      state.promptLibrary.selectedCategory = e.target.value;
+      renderPromptCategories();
+      renderSubCategoryPrompts();
     });
   }
 
-  if (customEnd) {
-    customEnd.addEventListener('input', () => {
-      if (promptPresetSelect && promptPresetSelect.value !== 'custom') {
-        promptPresetSelect.value = 'custom';
-        if (promptPresetDesc) promptPresetDesc.textContent = 'Custom prompt';
-      }
-      updateBudgetDashboard();
-    });
-  }
-
-  // Prompt Preset Selector
+  const promptPresetSelect = document.getElementById('promptPresetSelect');
   if (promptPresetSelect) {
     promptPresetSelect.addEventListener('change', (e) => {
-      const presetId = e.target.value;
-      const preset = getPromptPreset(presetId);
-      if (preset) {
-        if (customStart) customStart.value = preset.prefix || '';
-        if (customEnd) customEnd.value = preset.suffix || '';
-        if (promptPresetDesc) {
-          promptPresetDesc.textContent = preset.description || '';
-          promptPresetDesc.title = preset.description || '';
-        }
-        updateBudgetDashboard();
-        log(`Applied prompt preset: "${preset.name}"`, 'engine');
+      const promptId = e.target.value;
+      if (!promptId) return;
+      state.promptLibrary.selectedPromptId = promptId;
+      state.promptLibrary.placeholderValues = {};
+      applySelectedPromptToWorkspace();
+      const p = getLibraryPromptById(promptId, state.promptLibrary.customPrompts);
+      if (p) log(`Applied prompt: "${p.title}"`, 'engine');
+    });
+  }
+
+  const promptSearchInput = document.getElementById('promptSearchInput');
+  if (promptSearchInput) {
+    promptSearchInput.addEventListener('input', (e) => {
+      state.promptLibrary.searchQuery = e.target.value;
+      renderPromptCategories();
+      renderSubCategoryPrompts();
+    });
+  }
+
+  const favPromptBtn = document.getElementById('favPromptBtn');
+  if (favPromptBtn) {
+    favPromptBtn.addEventListener('click', () => {
+      const { selectedPromptId, favorites } = state.promptLibrary;
+      if (!selectedPromptId) return;
+      if (favorites.has(selectedPromptId)) {
+        favorites.delete(selectedPromptId);
+      } else {
+        favorites.add(selectedPromptId);
+      }
+      localStorage.setItem('promptshelf_favorites', JSON.stringify(Array.from(favorites)));
+      favPromptBtn.textContent = favorites.has(selectedPromptId) ? '★' : '☆';
+      favPromptBtn.classList.toggle('text-amber-400', favorites.has(selectedPromptId));
+      renderPromptCategories();
+      renderSubCategoryPrompts();
+    });
+  }
+
+  const togglePromptPreviewBtn = document.getElementById('togglePromptPreviewBtn');
+  if (togglePromptPreviewBtn) {
+    togglePromptPreviewBtn.addEventListener('click', () => {
+      state.promptLibrary.showRawPreview = !state.promptLibrary.showRawPreview;
+      const wrap = document.getElementById('rawPromptPreviewWrap');
+      if (wrap) wrap.classList.toggle('hidden', !state.promptLibrary.showRawPreview);
+      togglePromptPreviewBtn.classList.toggle('bg-slate-800', state.promptLibrary.showRawPreview);
+    });
+  }
+
+  const copyRawPromptBtn = document.getElementById('copyRawPromptBtn');
+  if (copyRawPromptBtn) {
+    copyRawPromptBtn.addEventListener('click', () => {
+      const text = document.getElementById('rawPromptPreviewText')?.textContent || '';
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        log('Raw prompt template copied to clipboard', 'success');
+        const orig = copyRawPromptBtn.textContent;
+        copyRawPromptBtn.textContent = 'Copied!';
+        setTimeout(() => { copyRawPromptBtn.textContent = orig; }, 1800);
+      });
+    });
+  }
+
+  const promptPlacementMode = document.getElementById('promptPlacementMode');
+  if (promptPlacementMode) {
+    promptPlacementMode.addEventListener('change', (e) => {
+      state.promptLibrary.placementMode = e.target.value;
+      const promptObj = getLibraryPromptById(state.promptLibrary.selectedPromptId, state.promptLibrary.customPrompts);
+      syncPromptTextareas(promptObj);
+    });
+  }
+
+  const autoFillVariablesBtn = document.getElementById('autoFillVariablesBtn');
+  if (autoFillVariablesBtn) {
+    autoFillVariablesBtn.addEventListener('click', handleAutoFillPlaceholders);
+  }
+
+  const resetPlaceholdersBtn = document.getElementById('resetPlaceholdersBtn');
+  if (resetPlaceholdersBtn) {
+    resetPlaceholdersBtn.addEventListener('click', () => {
+      state.promptLibrary.placeholderValues = {};
+      const promptObj = getLibraryPromptById(state.promptLibrary.selectedPromptId, state.promptLibrary.customPrompts);
+      renderPlaceholderInputs(promptObj);
+      syncPromptTextareas(promptObj);
+      log('Prompt variables reset', 'engine');
+    });
+  }
+
+  // Backup Import & Export
+  const exportPromptsBtn = document.getElementById('exportPromptsBtn');
+  if (exportPromptsBtn) exportPromptsBtn.addEventListener('click', exportPromptsBackup);
+
+  const importPromptsBtn = document.getElementById('importPromptsBtn');
+  const importPromptInput = document.getElementById('importPromptInput');
+  if (importPromptsBtn && importPromptInput) {
+    importPromptsBtn.addEventListener('click', () => importPromptInput.click());
+    importPromptInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        importPromptsBackup(e.target.files[0]);
+        e.target.value = '';
       }
     });
   }
+
+  // Custom Prompt Modal & Form
+  const openCustomPromptModalBtn = document.getElementById('openCustomPromptModalBtn');
+  const customPromptModal = document.getElementById('customPromptModal');
+  const closeCustomPromptModalBtn = document.getElementById('closeCustomPromptModalBtn');
+  const cancelCustomPromptBtn = document.getElementById('cancelCustomPromptBtn');
+  const customPromptForm = document.getElementById('customPromptForm');
+
+  if (openCustomPromptModalBtn && customPromptModal) {
+    openCustomPromptModalBtn.addEventListener('click', () => {
+      customPromptModal.classList.remove('hidden');
+    });
+  }
+
+  const closeCustomModal = () => {
+    if (customPromptModal) customPromptModal.classList.add('hidden');
+    if (customPromptForm) customPromptForm.reset();
+  };
+
+  if (closeCustomPromptModalBtn) closeCustomPromptModalBtn.addEventListener('click', closeCustomModal);
+  if (cancelCustomPromptBtn) cancelCustomPromptBtn.addEventListener('click', closeCustomModal);
+  if (customPromptModal) {
+    customPromptModal.addEventListener('click', (e) => {
+      if (e.target === customPromptModal) closeCustomModal();
+    });
+  }
+
+  if (customPromptForm) {
+    customPromptForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const title = document.getElementById('newPromptTitle')?.value.trim();
+      const category = document.getElementById('newPromptCategory')?.value;
+      const description = document.getElementById('newPromptDesc')?.value.trim();
+      const prompt = document.getElementById('newPromptBody')?.value.trim();
+
+      if (title && description && prompt) {
+        const id = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+        const newPrompt = {
+          id,
+          title,
+          category,
+          kind: 'Custom Prompt',
+          featured: false,
+          description,
+          tags: ['Custom'],
+          prompt,
+          createdAt: Date.now()
+        };
+
+        state.promptLibrary.customPrompts.unshift(newPrompt);
+        localStorage.setItem('promptshelf_custom', JSON.stringify(state.promptLibrary.customPrompts));
+        state.promptLibrary.selectedCategory = 'custom';
+        state.promptLibrary.selectedPromptId = id;
+        state.promptLibrary.placeholderValues = {};
+
+        closeCustomModal();
+        renderPromptCategories();
+        renderSubCategoryPrompts();
+        log(`Created custom prompt: "${title}"`, 'success');
+      }
+    });
+  }
+
+  // Initial render of PromptShelf Studio
+  renderPromptCategories();
+  renderSubCategoryPrompts();
 
   // Actions
   if (generateBtn) generateBtn.addEventListener('click', downloadContextFile);
