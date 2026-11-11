@@ -1,19 +1,91 @@
-/* Custom terminal and application styles */
+/* SandSquircle UI - Standalone Design Tokens & Component Styling */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-/* Terminal Custom Scrollbar */
+:root {
+  /* Sand Canvas Foundation */
+  --ss-sand-50: #FBF9F6;
+  --ss-sand-100: #F8F6F2; /* Primary Canvas */
+  --ss-sand-200: #F4EFEA; /* Subtle Dividers */
+  --ss-sand-300: #EAE2D8; /* Active Borders / Tab Tracks */
+  --ss-sand-400: #D8CDC0; /* Muted Hairlines */
+
+  /* Charcoal Ink Hierarchy */
+  --ss-charcoal-100: #F3F4F6;
+  --ss-charcoal-200: #E5E7EB;
+  --ss-charcoal-400: #9CA3AF;
+  --ss-charcoal-500: #6B7280; /* Secondary Subtitles & Inactive Icons */
+  --ss-charcoal-700: #374151; /* Form Labels & Section Titles */
+  --ss-charcoal-800: #1F2937; /* Dark Hero Gradient End */
+  --ss-charcoal-900: #111827; /* Primary Headings, FAB & Main CTAs */
+  --ss-charcoal-950: #0B0F17;
+
+  /* Brand Teal Accents */
+  --ss-teal-50: #F0FDFA;
+  --ss-teal-600: #0D9488; /* Active Nav & Accent Elements */
+  --ss-teal-700: #0F766E;
+
+  /* Semantic Status */
+  --ss-emerald-mint-text: #10B981;
+  --ss-emerald-mint-bg: #ECFDF5;
+  --ss-emerald-mint-border: #D1FAE5;
+
+  --ss-crimson-coral-text: #EF4444;
+  --ss-crimson-coral-bg: #FEF2F2;
+  --ss-crimson-coral-border: #FEE2E2;
+
+  --ss-amber-sand-text: #F59E0B;
+  --ss-amber-sand-bg: #FFFBEB;
+  --ss-amber-sand-border: #FEF3C7;
+
+  /* Continuous Squircle Radii */
+  --ss-radius-modal: 32px;
+  --ss-radius-hero: 28px;
+  --ss-radius-card: 26px;
+  --ss-radius-mini: 22px;
+  --ss-radius-squircle: 16px;
+  --ss-radius-chip: 12px;
+  --ss-radius-logo: 22%;
+
+  /* Ultra-Diffused Shadows */
+  --ss-shadow-soft-card: 0 10px 30px -4px rgba(0, 0, 0, 0.04);
+  --ss-shadow-soft-card-hover: 0 14px 34px -4px rgba(0, 0, 0, 0.07);
+  --ss-shadow-modal-sheet: 0 25px 60px -12px rgba(0, 0, 0, 0.18);
+
+  /* Typography */
+  --ss-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ss-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom Scrollbar */
 .terminal-scroll::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 .terminal-scroll::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #111827;
 }
 .terminal-scroll::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #374151;
   border-radius: 4px;
 }
 .terminal-scroll::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #4B5563;
+}
+
+/* Light Container Scrollbars */
+.light-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.light-scroll::-webkit-scrollbar-track {
+  background: #F4EFEA;
+}
+.light-scroll::-webkit-scrollbar-thumb {
+  background: #D8CDC0;
+  border-radius: 4px;
+}
+.light-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
 }
 
 /* Drop Zone Transitions */
@@ -22,10 +94,10 @@
 }
 
 .drop-zone.active {
-  border-color: #3b82f6;
-  background-color: #eff6ff;
+  border-color: #0D9488 !important;
+  background-color: #F0FDFA !important;
   transform: scale(1.01);
-  box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 30px -5px rgba(13, 148, 136, 0.25) !important;
 }
 
 /* Mode pill buttons */
@@ -34,37 +106,40 @@
 }
 
 .mode-btn.active-full {
-  background-color: #2563eb;
-  color: #ffffff;
-  font-weight: 600;
+  background-color: #111827 !important;
+  color: #FBF9F6 !important;
+  font-weight: 700 !important;
 }
 
 .mode-btn.active-compressed {
-  background-color: #059669;
-  color: #ffffff;
-  font-weight: 600;
+  background-color: #ECFDF5 !important;
+  color: #047857 !important;
+  border: 1px solid #A7F3D0 !important;
+  font-weight: 700 !important;
 }
 
 .mode-btn.active-skeleton {
-  background-color: #7c3aed;
-  color: #ffffff;
-  font-weight: 600;
+  background-color: #FFFBEB !important;
+  color: #B45309 !important;
+  border: 1px solid #FDE68A !important;
+  font-weight: 700 !important;
 }
 
 .mode-btn.active-duplicate {
-  background-color: #581c87;
-  color: #e9d5ff;
-  font-weight: 600;
+  background-color: #F3E8FF !important;
+  color: #6B21A8 !important;
+  border: 1px solid #E9D5FF !important;
+  font-weight: 700 !important;
 }
 
 /* Progress bar transitions */
 .token-bar-fill {
-  transition: width 0.4s ease-out, background-color 0.4s ease-out;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease-out;
 }
 
 /* Subtle code font styling */
 .font-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--ss-font-mono);
 }
 
 /* Toast animation */
@@ -101,7 +176,9 @@
 }
 
 .folder-chip:hover {
-  background-color: rgba(51, 65, 85, 0.8);
+  background-color: #FFFFFF !important;
+  border-color: #EAE2D8 !important;
+  transform: translateY(-1px);
 }
 
 /* PromptShelf Studio & Category Pill Styling */
@@ -111,15 +188,15 @@
 }
 
 .prompt-cat-pill:hover {
-  background-color: rgba(30, 41, 59, 0.9);
-  border-color: rgba(100, 116, 139, 0.8);
+  background-color: #FFFFFF !important;
+  border-color: #0D9488 !important;
   transform: translateY(-1px);
 }
 
 .prompt-cat-pill.active {
-  background-color: rgba(59, 130, 246, 0.2);
-  border-color: #3b82f6;
-  color: #ffffff;
-  box-shadow: 0 0 14px -2px rgba(59, 130, 246, 0.35);
+  background-color: #F0FDFA !important;
+  border-color: #0D9488 !important;
+  color: #0F766E !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px -2px rgba(13, 148, 136, 0.25) !important;
 }
-

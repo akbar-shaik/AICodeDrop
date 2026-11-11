@@ -373,7 +373,7 @@ function runWorkerBatchTokenization() {
   state.isWorkerTokenizing = true;
   if (tokenizerStatusBadge) {
     tokenizerStatusBadge.textContent = 'Calculating exact BPE (o200k)...';
-    tokenizerStatusBadge.className = 'text-[10px] font-mono text-cyan-400 animate-pulse';
+    tokenizerStatusBadge.className = 'text-[10px] font-mono text-teal-600 font-semibold animate-pulse';
   }
 
   const batch = {};
@@ -399,8 +399,8 @@ function runWorkerBatchTokenization() {
       const status = getTokenizerStatus();
       tokenizerStatusBadge.textContent = status.isExact ? `Exact BPE (${status.encoding})` : 'Heuristic Estimate';
       tokenizerStatusBadge.className = status.isExact
-        ? 'text-[10px] font-mono text-emerald-400 font-semibold'
-        : 'text-[10px] font-mono text-amber-400';
+        ? 'text-[10px] font-mono text-emerald-700 font-bold'
+        : 'text-[10px] font-mono text-amber-700 font-semibold';
     }
 
     renderFileList();
@@ -493,12 +493,12 @@ function renderFolderPills() {
     const selectedCount = folderEntries.filter(e => e.selected).length;
 
     const chip = document.createElement('div');
-    chip.className = `folder-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono border cursor-pointer select-none transition-colors ${
+    chip.className = `folder-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono border cursor-pointer select-none transition-all shadow-sm active:scale-95 ${
       selState === 'all'
-        ? 'bg-blue-950/70 border-blue-600/70 text-blue-200 hover:bg-blue-900/80'
+        ? 'bg-teal-50 border-teal-600 text-teal-800 font-bold'
         : selState === 'partial'
-        ? 'bg-amber-950/50 border-amber-600/60 text-amber-200 hover:bg-amber-900/70'
-        : 'bg-slate-900/60 border-slate-700/60 text-slate-400 hover:bg-slate-800/80 hover:text-slate-300'
+        ? 'bg-amberSand-bg border-amberSand-border text-amberSand-text font-semibold'
+        : 'bg-sand-50 border-sand-300 text-charcoal-500 hover:bg-white hover:text-charcoal-800'
     }`;
     chip.title = `Click to toggle selection for all files in "${folderPath}" (${selectedCount}/${folderEntries.length} selected)`;
 
@@ -507,7 +507,7 @@ function renderFolderPills() {
     checkbox.type = 'checkbox';
     checkbox.checked = selState === 'all';
     checkbox.indeterminate = selState === 'partial';
-    checkbox.className = 'w-3.5 h-3.5 rounded text-blue-500 bg-slate-800 border-slate-600 focus:ring-0 cursor-pointer pointer-events-none';
+    checkbox.className = 'w-3.5 h-3.5 rounded text-teal-600 bg-sand-50 border-sand-300 focus:ring-0 cursor-pointer pointer-events-none';
 
     // Folder icon + Name
     const nameSpan = document.createElement('span');
@@ -564,7 +564,7 @@ function syncFolderHeaderState(folderPath) {
  */
 function createFileRowElement(entry) {
   const row = document.createElement('div');
-  row.className = `flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg border border-slate-700/60 bg-slate-900/60 hover:bg-slate-800/80 transition-colors gap-2`;
+  row.className = `flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-2xl border border-sand-200 bg-white hover:border-sand-300 shadow-soft-card transition-all gap-2`;
 
   // Left section: checkbox + badges + path
   const left = document.createElement('div');
@@ -573,7 +573,7 @@ function createFileRowElement(entry) {
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.checked = entry.selected;
-  checkbox.className = 'w-4 h-4 rounded text-blue-500 bg-slate-800 border-slate-600 focus:ring-blue-500 focus:ring-offset-slate-900 cursor-pointer';
+  checkbox.className = 'w-4 h-4 rounded text-teal-600 bg-sand-50 border-sand-300 focus:ring-teal-600 cursor-pointer';
   checkbox.addEventListener('change', () => {
     entry.selected = checkbox.checked;
     updateBudgetDashboard();
@@ -583,7 +583,7 @@ function createFileRowElement(entry) {
 
   const ext = getExtension(entry.path);
   const badge = document.createElement('span');
-  badge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-slate-800 text-slate-400 border border-slate-700';
+  badge.className = 'px-2 py-0.5 text-[10px] uppercase font-mono font-bold rounded-lg bg-sand-100 text-charcoal-700 border border-sand-200';
   badge.textContent = ext || 'txt';
 
   left.appendChild(checkbox);
@@ -592,14 +592,14 @@ function createFileRowElement(entry) {
   // Duplicate badge [DUP]
   if (entry.isDuplicateOf) {
     const dupBadge = document.createElement('span');
-    dupBadge.className = 'px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold rounded bg-purple-950/80 text-purple-300 border border-purple-800/80';
+    dupBadge.className = 'px-2 py-0.5 text-[10px] uppercase font-mono font-bold rounded-lg bg-purple-50 text-purple-700 border border-purple-200';
     dupBadge.textContent = 'DUP';
     dupBadge.title = `Identical content to ${entry.isDuplicateOf}`;
     left.appendChild(dupBadge);
   }
 
   const pathLabel = document.createElement('span');
-  pathLabel.className = 'font-mono text-xs text-slate-200 truncate cursor-pointer hover:text-blue-400 transition-colors';
+  pathLabel.className = 'font-mono text-xs text-charcoal-800 truncate cursor-pointer hover:text-teal-700 transition-colors font-medium';
   pathLabel.textContent = entry.path;
   pathLabel.title = entry.isDuplicateOf ? `Duplicate of ${entry.isDuplicateOf}` : `Click to preview: ${entry.path}`;
   pathLabel.addEventListener('click', () => openPreviewModal(entry));
@@ -613,13 +613,13 @@ function createFileRowElement(entry) {
   // Token count badge
   const tokenBadge = document.createElement('span');
   tokenBadge.className = entry.isDuplicateOf
-    ? 'font-mono text-xs text-purple-300 bg-purple-950/60 border border-purple-800/50 px-2 py-0.5 rounded'
-    : 'font-mono text-xs text-indigo-300 bg-indigo-950/60 border border-indigo-800/50 px-2 py-0.5 rounded';
+    ? 'font-mono text-xs text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-lg font-semibold'
+    : 'font-mono text-xs text-charcoal-700 bg-sand-100 border border-sand-200 px-2 py-0.5 rounded-lg font-semibold';
   tokenBadge.textContent = entry.isDuplicateOf ? `~5 tok (ref)` : `~${(entry.tokens || 0).toLocaleString()} tok`;
 
   // Mode Selector (Full | Comp | Skel | Dup)
   const modeGroup = document.createElement('div');
-  modeGroup.className = 'inline-flex rounded-md shadow-sm border border-slate-700 bg-slate-950 p-0.5 text-xs';
+  modeGroup.className = 'inline-flex rounded-xl shadow-sm border border-sand-200 bg-sand-50 p-0.5 text-xs';
 
   const modes = [
     { key: 'full', label: 'Full', title: 'Complete code' },
@@ -634,8 +634,8 @@ function createFileRowElement(entry) {
   modes.forEach(m => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `px-2 py-0.5 rounded mode-btn font-mono text-[11px] ${
-      entry.mode === m.key ? `active-${m.key}` : 'text-slate-400 hover:text-white'
+    btn.className = `px-2.5 py-0.5 rounded-lg mode-btn font-mono text-[11px] ${
+      entry.mode === m.key ? `active-${m.key}` : 'text-charcoal-500 hover:text-charcoal-900'
     }`;
     btn.textContent = m.label;
     btn.title = m.title;
@@ -647,8 +647,8 @@ function createFileRowElement(entry) {
       tokenBadge.textContent = entry.mode === 'duplicate' ? `~5 tok (ref)` : `~${entry.tokens.toLocaleString()} tok`;
 
       Array.from(modeGroup.children).forEach((b, idx) => {
-        b.className = `px-2 py-0.5 rounded mode-btn font-mono text-[11px] ${
-          modes[idx].key === m.key ? `active-${modes[idx].key}` : 'text-slate-400 hover:text-white'
+        b.className = `px-2.5 py-0.5 rounded-lg mode-btn font-mono text-[11px] ${
+          modes[idx].key === m.key ? `active-${modes[idx].key}` : 'text-charcoal-500 hover:text-charcoal-900'
         }`;
       });
 
@@ -662,7 +662,7 @@ function createFileRowElement(entry) {
   // Preview Button
   const previewBtn = document.createElement('button');
   previewBtn.type = 'button';
-  previewBtn.className = 'text-slate-400 hover:text-blue-400 p-1 transition-colors';
+  previewBtn.className = 'text-charcoal-400 hover:text-teal-700 p-1.5 rounded-lg hover:bg-sand-100 transition-colors';
   previewBtn.title = 'Preview transformed code';
   previewBtn.innerHTML = `
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -720,11 +720,11 @@ function renderFileList() {
       const folderTokens = folderEntries.reduce((sum, e) => sum + (e.isDuplicateOf ? 5 : (e.tokens || 0)), 0);
 
       const groupDiv = document.createElement('div');
-      groupDiv.className = 'folder-group mb-2 border border-slate-800/80 rounded-xl overflow-hidden bg-slate-900/40';
+      groupDiv.className = 'folder-group mb-2 border border-sand-200 rounded-2xl overflow-hidden bg-white shadow-soft-card';
 
       // Folder Header
       const header = document.createElement('div');
-      header.className = 'folder-header flex flex-col sm:flex-row sm:items-center justify-between p-2.5 bg-slate-950/70 border-b border-slate-800/60 gap-2 select-none';
+      header.className = 'folder-header flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-sand-50/90 border-b border-sand-200 gap-2 select-none';
       header.setAttribute('data-folder', folderPath);
 
       // Left: Chevron + Checkbox + Icon + Folder Path + Count/Tokens Badges
@@ -734,7 +734,7 @@ function renderFileList() {
       // Chevron
       const chevronBtn = document.createElement('button');
       chevronBtn.type = 'button';
-      chevronBtn.className = `folder-chevron p-1 text-slate-400 hover:text-white transition-transform ${isCollapsed ? 'collapsed' : ''}`;
+      chevronBtn.className = `folder-chevron p-1 text-charcoal-400 hover:text-charcoal-900 transition-transform ${isCollapsed ? 'collapsed' : ''}`;
       chevronBtn.title = isCollapsed ? 'Expand folder' : 'Collapse folder';
       chevronBtn.innerHTML = `
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -751,7 +751,7 @@ function renderFileList() {
       folderCheckbox.type = 'checkbox';
       folderCheckbox.checked = selState === 'all';
       folderCheckbox.indeterminate = selState === 'partial';
-      folderCheckbox.className = 'folder-select-checkbox w-4 h-4 rounded text-blue-500 bg-slate-800 border-slate-600 focus:ring-blue-500 cursor-pointer';
+      folderCheckbox.className = 'folder-select-checkbox w-4 h-4 rounded text-teal-600 bg-sand-50 border-sand-300 focus:ring-teal-600 cursor-pointer';
       folderCheckbox.title = `Toggle selection for all files in ${folderPath}`;
       folderCheckbox.addEventListener('change', (e) => {
         e.stopPropagation();
@@ -765,11 +765,11 @@ function renderFileList() {
       nameContainer.addEventListener('click', () => toggleFolderCollapse(folderPath));
 
       const folderIcon = document.createElement('span');
-      folderIcon.className = 'text-amber-400 text-sm';
+      folderIcon.className = 'text-amber-500 text-sm';
       folderIcon.textContent = '📁';
 
       const folderName = document.createElement('span');
-      folderName.className = 'font-mono text-xs font-bold text-slate-200 hover:text-blue-400 transition-colors truncate';
+      folderName.className = 'font-mono text-xs font-bold text-charcoal-800 hover:text-teal-700 transition-colors truncate';
       folderName.textContent = folderPath;
 
       nameContainer.appendChild(folderIcon);
@@ -777,12 +777,12 @@ function renderFileList() {
 
       // Folder File Count Badge
       const countBadge = document.createElement('span');
-      countBadge.className = 'folder-count-badge text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 shrink-0';
+      countBadge.className = 'folder-count-badge text-[10px] font-mono px-2 py-0.5 rounded-full bg-sand-200 text-charcoal-700 border border-sand-300 font-semibold shrink-0';
       countBadge.textContent = `${selectedCount}/${folderEntries.length} files`;
 
       // Folder Tokens Badge
       const tokenBadge = document.createElement('span');
-      tokenBadge.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/40 shrink-0';
+      tokenBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-sand-200 text-charcoal-700 border border-sand-300 font-semibold shrink-0';
       tokenBadge.textContent = `~${folderTokens.toLocaleString()} tok`;
 
       left.appendChild(chevronBtn);
@@ -796,7 +796,7 @@ function renderFileList() {
       right.className = 'flex items-center gap-1.5 shrink-0 self-end sm:self-auto';
 
       const folderModeSpan = document.createElement('span');
-      folderModeSpan.className = 'text-[10px] font-mono text-slate-500 uppercase mr-1 hidden sm:inline';
+      folderModeSpan.className = 'text-[10px] font-mono text-charcoal-400 uppercase mr-1 hidden sm:inline font-semibold';
       folderModeSpan.textContent = 'Folder Mode:';
       right.appendChild(folderModeSpan);
 
@@ -809,7 +809,7 @@ function renderFileList() {
       fModes.forEach(fm => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'px-1.5 py-0.5 rounded text-[10px] font-mono border border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:border-slate-500 transition-colors';
+        btn.className = 'px-2 py-0.5 rounded-lg text-[10px] font-mono border border-sand-300 bg-white text-charcoal-700 hover:text-charcoal-900 hover:border-sand-400 transition-all active:scale-95';
         btn.textContent = fm.label;
         btn.title = fm.title;
         btn.addEventListener('click', (e) => {
@@ -825,7 +825,7 @@ function renderFileList() {
 
       // Children list
       const childrenDiv = document.createElement('div');
-      childrenDiv.className = `folder-children p-2 space-y-1.5 ${isCollapsed ? 'hidden' : ''}`;
+      childrenDiv.className = `folder-children p-2.5 space-y-2 bg-sand-50/20 ${isCollapsed ? 'hidden' : ''}`;
 
       folderEntries.forEach(entry => {
         childrenDiv.appendChild(createFileRowElement(entry));
@@ -847,11 +847,11 @@ function openPreviewModal(entry) {
   if (previewTitle) previewTitle.textContent = entry.path;
   if (previewModeBadge) {
     previewModeBadge.textContent = entry.mode.toUpperCase();
-    previewModeBadge.className = `px-2 py-0.5 rounded text-xs font-mono font-bold uppercase ${
-      entry.mode === 'full' ? 'bg-blue-600 text-white' :
+    previewModeBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-mono font-bold uppercase ${
+      entry.mode === 'full' ? 'bg-charcoal-900 text-sand-50' :
       entry.mode === 'compressed' ? 'bg-emerald-600 text-white' :
       entry.mode === 'duplicate' ? 'bg-purple-900 text-purple-200' :
-      'bg-purple-600 text-white'
+      'bg-amber-600 text-white'
     }`;
   }
   if (previewCode) {
@@ -905,12 +905,12 @@ function renderPromptCategories() {
       <button
         type="button"
         data-cat-id="${c.id}"
-        class="prompt-cat-pill px-2.5 py-1 rounded-lg border border-slate-700/80 bg-slate-950/80 text-slate-300 hover:text-white text-[11px] font-mono inline-flex items-center gap-1.5 ${isActive ? 'active' : ''}"
+        class="prompt-cat-pill px-3 py-1.5 rounded-xl border border-sand-300 bg-sand-50 text-charcoal-700 text-xs font-mono inline-flex items-center gap-1.5 active:scale-[0.98] ${isActive ? 'active' : ''}"
         title="View ${c.name} (${count} prompts)"
       >
         <span>${c.icon}</span>
         <span>${c.name}</span>
-        <span class="text-[10px] text-slate-500">(${count})</span>
+        <span class="text-[10px] text-charcoal-400">(${count})</span>
       </button>
     `;
   }).join('');
@@ -1004,7 +1004,7 @@ function applySelectedPromptToWorkspace() {
   }
   if (tagsWrap) {
     tagsWrap.innerHTML = (promptObj.tags || []).map(t =>
-      `<span class="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400">${t}</span>`
+      `<span class="px-2 py-0.5 rounded-md bg-sand-200 border border-sand-300 text-[10px] font-mono text-charcoal-600 font-medium">${t}</span>`
     ).join('');
   }
   if (rawPreview) {
@@ -1040,13 +1040,13 @@ function renderPlaceholderInputs(promptObj) {
     const currentVal = (state.promptLibrary.placeholderValues[ph] || '').replace(/"/g, '&quot;');
     return `
       <div>
-        <label class="block text-[10px] font-mono text-slate-400 mb-1">[${ph}]</label>
+        <label class="block text-[10px] font-mono font-bold text-charcoal-700 mb-1">[${ph}]</label>
         <input
           type="text"
           data-placeholder-key="${ph}"
           value="${currentVal}"
           placeholder="Enter ${ph.toLowerCase()}..."
-          class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500"
+          class="w-full bg-white border border-sand-300 rounded-xl px-3 py-2 text-xs text-charcoal-900 placeholder-charcoal-400 font-mono focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-sm transition-all"
         />
       </div>
     `;
@@ -1447,8 +1447,8 @@ function initEvents() {
     if (tokenizerStatusBadge) {
       tokenizerStatusBadge.textContent = status.usingBPE ? `Exact BPE (${status.encoding})` : 'Heuristic Estimate';
       tokenizerStatusBadge.className = status.usingBPE
-        ? 'text-[10px] font-mono text-emerald-400 font-semibold'
-        : 'text-[10px] font-mono text-amber-400';
+        ? 'text-[10px] font-mono text-emerald-700 font-bold'
+        : 'text-[10px] font-mono text-amber-700 font-semibold';
     }
   });
 
@@ -1702,7 +1702,7 @@ function initEvents() {
       }
       localStorage.setItem('promptshelf_favorites', JSON.stringify(Array.from(favorites)));
       favPromptBtn.textContent = favorites.has(selectedPromptId) ? '★' : '☆';
-      favPromptBtn.classList.toggle('text-amber-400', favorites.has(selectedPromptId));
+      favPromptBtn.classList.toggle('text-amber-500', favorites.has(selectedPromptId));
       renderPromptCategories();
       renderSubCategoryPrompts();
     });
@@ -1714,7 +1714,7 @@ function initEvents() {
       state.promptLibrary.showRawPreview = !state.promptLibrary.showRawPreview;
       const wrap = document.getElementById('rawPromptPreviewWrap');
       if (wrap) wrap.classList.toggle('hidden', !state.promptLibrary.showRawPreview);
-      togglePromptPreviewBtn.classList.toggle('bg-slate-800', state.promptLibrary.showRawPreview);
+      togglePromptPreviewBtn.classList.toggle('bg-sand-200', state.promptLibrary.showRawPreview);
     });
   }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,59 +7,114 @@
   <meta name="description" content="Convert multi-file codebases into optimized LLM-ready XML/text context completely in your browser. Zero uploads, zero hosting costs, infinite codebase capacity." />
   
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg" />
+  
+  <!-- Plus Jakarta Sans & JetBrains Mono Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="src/css/styles.css" />
   
+  <!-- SandSquircle Tailwind Design Tokens -->
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            brand: {
-              50: '#eff6ff',
-              100: '#dbeafe',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
-              800: '#1e40af',
-              900: '#1e3a8a'
-            }
-          }
+            sand: {
+              50: '#FBF9F6',
+              100: '#F8F6F2', // Primary Canvas
+              200: '#F4EFEA', // Subtle Card Dividers
+              300: '#EAE2D8', // Active Tab / Border Tint
+              400: '#D8CDC0', // Muted Borders
+            },
+            charcoal: {
+              100: '#F3F4F6',
+              200: '#E5E7EB',
+              300: '#D1D5DB',
+              400: '#9CA3AF',
+              500: '#6B7280', // Subtitles & Inactive Icons
+              700: '#374151', // Section Titles & Labels
+              800: '#1F2937', // Dark Card Gradient End
+              900: '#111827', // Primary Ink & High-Priority CTAs
+              950: '#0B0F17',
+            },
+            teal: {
+              50: '#F0FDFA',  // Active Tab Tint
+              100: '#CCFBF1',
+              500: '#14B8A6',
+              600: '#0D9488', // Primary Brand Accent & Active Nav
+              700: '#0F766E', // Hover State
+            },
+            emeraldMint: {
+              text: '#10B981',
+              bg: '#ECFDF5',
+              border: '#D1FAE5',
+            },
+            crimsonCoral: {
+              text: '#EF4444',
+              bg: '#FEF2F2',
+              border: '#FEE2E2',
+            },
+            amberSand: {
+              text: '#F59E0B',
+              bg: '#FFFBEB',
+              border: '#FEF3C7',
+            },
+          },
+          borderRadius: {
+            '12': '12px',
+            '16': '16px',
+            '22': '22px', // Metric Summary Mini-Cards
+            '26': '26px', // Standard Primary Cards
+            '28': '28px', // Dark Hero & Settings Cards
+            '32': '32px', // Modals & Bottom Sheets
+            'logo': '22%', // App Brand Squircle
+          },
+          boxShadow: {
+            'soft-card': '0 10px 30px -4px rgba(0, 0, 0, 0.04)',
+            'soft-card-hover': '0 14px 34px -4px rgba(0, 0, 0, 0.07)',
+            'pill-dock': '0 20px 40px -6px rgba(0, 0, 0, 0.08), 0 1px 3px 0 rgba(0, 0, 0, 0.04)',
+            'elevated-fab': '0 12px 24px -4px rgba(17, 24, 39, 0.28)',
+            'modal-sheet': '0 25px 60px -12px rgba(0, 0, 0, 0.18)',
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+          },
         }
       }
     };
   </script>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-blue-600 selection:text-white flex flex-col">
+<body class="bg-sand-100 text-charcoal-900 min-h-screen font-sans antialiased selection:bg-teal-600 selection:text-white flex flex-col">
 
   <!-- Top Navigation / Header -->
-  <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur sticky top-0 z-30">
+  <header class="border-b border-sand-200/80 bg-white/80 backdrop-blur sticky top-0 z-30">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-emerald-400 p-0.5 shadow-lg shadow-blue-500/20 flex items-center justify-center">
-          <div class="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
-            <svg class="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="16 18 22 12 16 6"></polyline>
-              <polyline points="8 6 2 12 8 18"></polyline>
-            </svg>
-          </div>
+        <div class="w-10 h-10 rounded-[22%] bg-charcoal-900 shadow-md flex items-center justify-center p-2 text-teal-400">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">AICodeDrop</span>
-            <span class="text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">v2.0</span>
-            <span class="hidden sm:inline-flex text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="font-extrabold text-lg tracking-tight text-charcoal-900">AICodeDrop</span>
+            <span class="text-[10px] font-mono font-bold bg-sand-200 text-charcoal-700 border border-sand-300 px-2 py-0.5 rounded-full">v2.6</span>
+            <span class="hidden sm:inline-flex text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Netlify 100% Client-Side
             </span>
           </div>
-          <p class="text-xs text-slate-400 hidden md:block">Zero-upload browser engine • Smart .gitignore • Token optimizer • Claude / GPT-4o / Gemini XML</p>
+          <p class="text-xs text-charcoal-500 hidden md:block">Zero-upload browser engine • Smart .gitignore • Token optimizer • Claude / GPT-4o / Gemini XML</p>
         </div>
       </div>
 
       <div class="flex items-center gap-3 text-xs">
-        <a href="https://github.com/akbar-shaik/AICodeDrop" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 transition-colors">
+        <a href="https://github.com/akbar-shaik/AICodeDrop" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 text-charcoal-700 hover:text-charcoal-900 px-3.5 py-2 rounded-xl border border-sand-300 bg-white hover:bg-sand-50 transition-all shadow-sm active:scale-95 font-medium">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
           </svg>
@@ -74,21 +129,21 @@
 
     <!-- Hero / Dropzone Area -->
     <div class="relative">
-      <div id="dropZone" class="drop-zone border-2 border-dashed border-slate-700 bg-slate-900/50 hover:bg-slate-900 hover:border-blue-500/80 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer text-center group shadow-xl">
-        <div class="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 group-hover:bg-blue-500/20 transition-transform mb-4">
+      <div id="dropZone" class="drop-zone border-2 border-dashed border-sand-300 bg-white hover:border-teal-600 rounded-[28px] p-10 flex flex-col items-center justify-center cursor-pointer text-center group shadow-soft-card hover:shadow-soft-card-hover transition-all">
+        <div class="w-16 h-16 rounded-[22%] bg-sand-100 border border-sand-200 flex items-center justify-center text-teal-600 group-hover:scale-110 group-hover:bg-teal-50 transition-all mb-4">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
         </div>
 
-        <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Drop your project folder here</h2>
-        <p class="text-slate-400 text-sm max-w-md mb-5">
-          Everything runs entirely in your browser. Zero code is sent to any server. Auto-parses <span class="text-blue-300 font-mono">.gitignore</span> and purges lockfiles automatically.
+        <h2 class="text-2xl font-extrabold text-charcoal-900 mb-2 tracking-tight">Drop your project folder here</h2>
+        <p class="text-charcoal-500 text-sm max-w-md mb-5 leading-relaxed">
+          Everything runs entirely in your browser. Zero code is sent to any server. Auto-parses <span class="text-teal-700 font-mono font-semibold bg-sand-100 px-1.5 py-0.5 rounded">.gitignore</span> and purges lockfiles automatically.
         </p>
 
         <div class="flex flex-wrap items-center justify-center gap-3">
-          <button id="btnSelectFolder" type="button" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm shadow-lg shadow-blue-600/30 flex items-center gap-2 transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button id="btnSelectFolder" type="button" class="px-6 py-3 rounded-2xl bg-charcoal-900 hover:bg-charcoal-800 text-sand-50 font-bold text-sm shadow-md flex items-center gap-2 transition-all active:scale-[0.98]">
+            <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
             Select Directory
@@ -99,19 +154,19 @@
       </div>
     </div>
 
-    <!-- Real-time Terminal Log Console -->
-    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-      <div class="bg-slate-950/80 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between">
+    <!-- Real-time Terminal Log Console (Dark Hero Card) -->
+    <div class="bg-gradient-to-br from-charcoal-900 to-charcoal-800 border border-charcoal-800 rounded-[28px] overflow-hidden shadow-xl">
+      <div class="bg-charcoal-950/80 px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <div class="w-3 h-3 rounded-full bg-rose-500/80"></div>
-          <div class="w-3 h-3 rounded-full bg-amber-500/80"></div>
-          <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
-          <span class="text-xs font-mono text-slate-400 ml-2">browser_engine ~ client_local</span>
+          <div class="w-3 h-3 rounded-full bg-rose-500/90"></div>
+          <div class="w-3 h-3 rounded-full bg-amber-500/90"></div>
+          <div class="w-3 h-3 rounded-full bg-emerald-500/90"></div>
+          <span class="text-xs font-mono text-charcoal-400 ml-2">browser_engine ~ client_local</span>
         </div>
-        <span class="text-[11px] font-mono text-slate-500">Live Ingestion Log</span>
+        <span class="text-[11px] font-mono text-charcoal-500">Live Ingestion Log</span>
       </div>
-      <div id="consoleOutput" class="p-3.5 h-36 font-mono text-xs terminal-scroll overflow-y-auto space-y-0.5 bg-slate-950">
-        <div class="text-slate-500">Awaiting directory drop or selection to initialize client pipeline...</div>
+      <div id="consoleOutput" class="p-4 h-36 font-mono text-xs terminal-scroll overflow-y-auto space-y-1 bg-charcoal-950/95 text-charcoal-300">
+        <div class="text-charcoal-500">Awaiting directory drop or selection to initialize client pipeline...</div>
       </div>
     </div>
 
@@ -119,93 +174,93 @@
     <div id="selectionArea" class="hidden space-y-6">
 
       <!-- Dynamic Token Budget Card -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+      <div class="bg-white border border-sand-200 rounded-[26px] p-6 shadow-soft-card space-y-4">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div class="flex items-center gap-3">
-              <h3 class="text-xl font-bold text-white tracking-tight">Context Token Meter</h3>
-              <span id="tokenTierBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold text-white bg-emerald-500">32K Budget</span>
-              <span id="tokenizerStatusBadge" class="text-[10px] font-mono text-cyan-400">Loading o200k BPE...</span>
+              <h3 class="text-xl font-extrabold text-charcoal-900 tracking-tight">Context Token Meter</h3>
+              <span id="tokenTierBadge" class="px-3 py-1 rounded-full text-xs font-bold text-white bg-emerald-600 shadow-sm inline-flex items-center gap-1.5">32K Budget</span>
+              <span id="tokenizerStatusBadge" class="text-[10px] font-mono text-teal-600 font-semibold">Loading o200k BPE...</span>
             </div>
-            <p id="tokenStatusText" class="text-xs text-slate-400 mt-1">Estimating real-time tokens...</p>
-            <p id="modelCalibrationDisplay" class="text-[11px] font-mono text-slate-500 mt-0.5"></p>
+            <p id="tokenStatusText" class="text-xs text-charcoal-500 mt-1">Estimating real-time tokens...</p>
+            <p id="modelCalibrationDisplay" class="text-[11px] font-mono text-charcoal-400 mt-0.5"></p>
           </div>
 
           <div class="flex items-baseline gap-4">
             <div class="text-right">
-              <div class="text-2xl font-bold font-mono text-white tracking-tight" id="tokenCountDisplay">0</div>
-              <div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Total Context Tokens</div>
-              <div class="text-[10px] font-mono text-slate-400" id="overheadTokensDisplay"></div>
+              <div class="text-3xl font-extrabold font-mono text-charcoal-900 tracking-tight" id="tokenCountDisplay">0</div>
+              <div class="text-[10px] font-mono text-charcoal-500 uppercase tracking-wider font-semibold">Total Context Tokens</div>
+              <div class="text-[10px] font-mono text-charcoal-400" id="overheadTokensDisplay"></div>
             </div>
-            <div class="border-l border-slate-800 pl-4 text-right">
-              <div class="text-lg font-bold font-mono text-slate-300" id="selectedFilesCount">0 / 0 selected</div>
-              <div class="text-[11px] font-mono text-slate-400 uppercase tracking-wider" id="totalSizeDisplay">0 B</div>
+            <div class="border-l border-sand-200 pl-4 text-right">
+              <div class="text-lg font-bold font-mono text-charcoal-700" id="selectedFilesCount">0 / 0 selected</div>
+              <div class="text-[11px] font-mono text-charcoal-500 uppercase tracking-wider" id="totalSizeDisplay">0 B</div>
             </div>
           </div>
         </div>
 
         <!-- Progress Bar with Model Tier Milestones -->
         <div class="space-y-1.5">
-          <div class="w-full h-3.5 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800 relative">
+          <div class="w-full h-3.5 bg-sand-100 rounded-full overflow-hidden p-0.5 border border-sand-200 relative">
             <div id="tokenProgressBar" class="h-full rounded-full token-bar-fill bg-emerald-500" style="width: 0%"></div>
           </div>
 
           <!-- Milestones markers -->
-          <div class="flex justify-between text-[11px] font-mono text-slate-400 px-1 pt-1">
+          <div class="flex justify-between text-[11px] font-mono text-charcoal-500 px-1 pt-1 font-medium">
             <span>0</span>
-            <span class="text-emerald-400">32k (Standard)</span>
-            <span class="text-blue-400">128k (GPT-4o)</span>
-            <span class="text-indigo-400">200k (Claude 3.7)</span>
-            <span class="text-purple-400">1M+ (Gemini Pro)</span>
+            <span class="text-emerald-700 font-semibold">32k (Standard)</span>
+            <span class="text-teal-700 font-semibold">128k (GPT-4o)</span>
+            <span class="text-indigo-700 font-semibold">200k (Claude 3.7)</span>
+            <span class="text-purple-700 font-semibold">1M+ (Gemini Pro)</span>
           </div>
         </div>
       </div>
 
       <!-- Controls & Filter Toolbar -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="bg-white border border-sand-200 rounded-[26px] p-4 shadow-soft-card flex flex-col md:flex-row md:items-center justify-between gap-4">
         <!-- Search & Filter -->
         <div class="relative flex-1 max-w-md">
-          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 text-charcoal-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <input type="text" id="fileSearch" placeholder="Filter files by path or extension..." class="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono" />
+          <input type="text" id="fileSearch" placeholder="Filter files by path or extension..." class="w-full pl-10 pr-4 py-2 bg-sand-50 border border-sand-300 rounded-2xl text-xs text-charcoal-900 placeholder-charcoal-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 font-mono transition-all" />
         </div>
 
         <!-- Bulk Controls -->
         <div class="flex flex-wrap items-center gap-2 text-xs">
-          <div class="flex items-center rounded-lg border border-slate-700 bg-slate-950 p-0.5">
-            <span class="px-2 text-[11px] text-slate-400 uppercase font-mono">Bulk Mode:</span>
-            <button id="bulkFullBtn" type="button" class="px-2.5 py-1 rounded font-medium text-slate-300 hover:text-white hover:bg-slate-800">Full</button>
-            <button id="bulkCompressedBtn" type="button" class="px-2.5 py-1 rounded font-medium text-emerald-300 hover:text-emerald-200 hover:bg-emerald-950/40">Compressed</button>
-            <button id="bulkSkeletonBtn" type="button" class="px-2.5 py-1 rounded font-medium text-purple-300 hover:text-purple-200 hover:bg-purple-950/40">Skeleton</button>
+          <div class="flex items-center rounded-xl border border-sand-200 bg-sand-100 p-1">
+            <span class="px-2 text-[11px] text-charcoal-500 uppercase font-mono font-semibold">Bulk Mode:</span>
+            <button id="bulkFullBtn" type="button" class="px-2.5 py-1 rounded-lg font-mono font-medium text-charcoal-700 hover:text-charcoal-900 hover:bg-white transition-all active:scale-95">Full</button>
+            <button id="bulkCompressedBtn" type="button" class="px-2.5 py-1 rounded-lg font-mono font-medium text-teal-700 hover:bg-teal-50 transition-all active:scale-95">Compressed</button>
+            <button id="bulkSkeletonBtn" type="button" class="px-2.5 py-1 rounded-lg font-mono font-medium text-amber-700 hover:bg-amber-50 transition-all active:scale-95">Skeleton</button>
           </div>
 
-          <button id="viewModeBtn" type="button" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors flex items-center gap-1.5" title="Toggle between Grouped by Folder and Flat List view">
+          <button id="viewModeBtn" type="button" class="px-3.5 py-2 rounded-xl border border-sand-300 bg-white hover:bg-sand-50 text-charcoal-700 font-medium transition-all shadow-sm active:scale-95 flex items-center gap-1.5" title="Toggle between Grouped by Folder and Flat List view">
             <span>📁 Grouped</span>
           </button>
 
-          <button id="toggleAllBtn" type="button" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors">
+          <button id="toggleAllBtn" type="button" class="px-3.5 py-2 rounded-xl border border-sand-300 bg-white hover:bg-sand-50 text-charcoal-700 font-medium transition-all shadow-sm active:scale-95">
             Deselect All
           </button>
         </div>
       </div>
 
       <!-- Advanced Options Banner -->
-      <div class="flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-900/70 border border-slate-800/80 rounded-xl px-4 py-2.5">
-        <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
-            <input type="checkbox" id="optSanitize" checked class="w-3.5 h-3.5 rounded text-blue-600 bg-slate-800 border-slate-600 focus:ring-blue-500" />
-            <span>Sanitize API Keys & Secrets</span>
+      <div class="flex flex-wrap items-center justify-between gap-3 text-xs bg-white border border-sand-200 rounded-2xl px-5 py-3 shadow-soft-card">
+        <div class="flex items-center gap-5">
+          <label class="flex items-center gap-2 cursor-pointer text-charcoal-700 hover:text-charcoal-900 font-medium">
+            <input type="checkbox" id="optSanitize" checked class="w-4 h-4 rounded text-teal-600 bg-sand-50 border-sand-300 focus:ring-teal-600" />
+            <span>Sanitize API Keys &amp; Secrets</span>
           </label>
-          <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
-            <input type="checkbox" id="optDocstrings" class="w-3.5 h-3.5 rounded text-blue-600 bg-slate-800 border-slate-600 focus:ring-blue-500" />
+          <label class="flex items-center gap-2 cursor-pointer text-charcoal-700 hover:text-charcoal-900 font-medium">
+            <input type="checkbox" id="optDocstrings" class="w-4 h-4 rounded text-teal-600 bg-sand-50 border-sand-300 focus:ring-teal-600" />
             <span>Preserve Docstrings / JSDoc</span>
           </label>
         </div>
 
         <div class="flex items-center gap-2">
-          <span class="text-slate-400 font-mono">Format:</span>
-          <select id="formatSelect" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1 font-mono focus:outline-none focus:border-blue-500">
+          <span class="text-charcoal-500 font-mono font-semibold">Format:</span>
+          <select id="formatSelect" class="bg-sand-50 border border-sand-300 text-charcoal-900 text-xs rounded-xl px-3 py-1.5 font-mono focus:outline-none focus:ring-2 focus:ring-charcoal-900 cursor-pointer">
             <option value="xml">Structured XML (Claude 3.7 / GPT-4o / Gemini)</option>
             <option value="text">Plain Text (.txt)</option>
           </select>
@@ -213,57 +268,57 @@
       </div>
 
       <!-- Folder Quick-Filter / Selection Bar -->
-      <div id="folderFilterBar" class="hidden flex-col gap-2 p-3 bg-slate-900/70 border border-slate-800/80 rounded-xl text-xs shadow-lg">
+      <div id="folderFilterBar" class="hidden flex-col gap-2 p-4 bg-white border border-sand-200 rounded-2xl text-xs shadow-soft-card">
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-1.5 text-slate-300 font-mono font-bold">
-            <span class="text-amber-400">📁</span>
+          <div class="flex items-center gap-1.5 text-charcoal-900 font-mono font-bold">
+            <span class="text-amber-500">📁</span>
             <span>Folders:</span>
-            <span class="text-[11px] font-normal text-slate-400">(Click a folder to select / unselect all its files)</span>
+            <span class="text-[11px] font-normal text-charcoal-500">(Click a folder to select / unselect all its files)</span>
           </div>
           <div class="flex items-center gap-2">
-            <button id="selectAllFoldersBtn" type="button" class="text-blue-400 hover:underline font-mono text-[11px]">Select All</button>
-            <span class="text-slate-600">•</span>
-            <button id="deselectAllFoldersBtn" type="button" class="text-slate-400 hover:underline font-mono text-[11px]">Deselect All</button>
+            <button id="selectAllFoldersBtn" type="button" class="text-teal-600 hover:text-teal-700 font-mono text-[11px] font-semibold hover:underline">Select All</button>
+            <span class="text-sand-300">•</span>
+            <button id="deselectAllFoldersBtn" type="button" class="text-charcoal-500 hover:text-charcoal-700 font-mono text-[11px] hover:underline">Deselect All</button>
           </div>
         </div>
-        <div id="folderPillsContainer" class="flex flex-wrap items-center gap-1.5 pt-1">
+        <div id="folderPillsContainer" class="flex flex-wrap items-center gap-2 pt-1">
           <!-- Dynamically populated with folder chips -->
         </div>
       </div>
 
       <!-- Interactive File List -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div class="p-3 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+      <div class="bg-white border border-sand-200 rounded-[26px] overflow-hidden shadow-soft-card">
+        <div class="p-3.5 bg-sand-50/90 border-b border-sand-200 flex items-center justify-between text-xs text-charcoal-700 font-mono font-bold">
           <div class="flex items-center gap-2">
             <span>SOURCE FILES</span>
-            <span id="folderCountBadge" class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700"></span>
+            <span id="folderCountBadge" class="text-[10px] bg-sand-200 text-charcoal-700 px-2 py-0.5 rounded-full border border-sand-300 font-semibold"></span>
           </div>
           <div class="flex items-center gap-2">
-            <button id="expandAllFoldersBtn" type="button" class="text-[11px] text-blue-400 hover:underline">Expand All</button>
-            <span class="text-slate-600">•</span>
-            <button id="collapseAllFoldersBtn" type="button" class="text-[11px] text-slate-400 hover:underline">Collapse All</button>
-            <span class="hidden sm:inline ml-3">MODE / TOKENS</span>
+            <button id="expandAllFoldersBtn" type="button" class="text-[11px] text-teal-600 hover:text-teal-700 font-semibold hover:underline">Expand All</button>
+            <span class="text-sand-300">•</span>
+            <button id="collapseAllFoldersBtn" type="button" class="text-[11px] text-charcoal-500 hover:text-charcoal-700 hover:underline">Collapse All</button>
+            <span class="hidden sm:inline ml-3 text-charcoal-400">MODE / TOKENS</span>
           </div>
         </div>
-        <div id="fileList" class="p-3 max-h-96 overflow-y-auto terminal-scroll space-y-2 bg-slate-950">
+        <div id="fileList" class="p-3.5 max-h-96 overflow-y-auto terminal-scroll space-y-2 bg-sand-50/30">
           <!-- Populated dynamically -->
         </div>
       </div>
 
       <!-- Prompts Customization (PromptShelf Library Integration) -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+      <div class="bg-white border border-sand-200 rounded-[26px] p-6 shadow-soft-card space-y-5">
         <!-- Top Header: Title + Search + Actions -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
-          <div class="flex items-center gap-2.5">
-            <div class="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-sm">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-sand-200 pb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-[22%] bg-teal-50 border border-teal-600/20 flex items-center justify-center text-teal-600 font-bold text-sm shadow-sm">
               ✦
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <h3 class="text-sm font-bold text-white tracking-tight">PromptShelf Studio</h3>
-                <span id="promptTotalCountBadge" class="text-[10px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-1.5 py-0.5 rounded">54+ Prompts</span>
+                <h3 class="text-base font-extrabold text-charcoal-900 tracking-tight">PromptShelf Studio</h3>
+                <span id="promptTotalCountBadge" class="text-[10px] font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full">54+ Prompts</span>
               </div>
-              <p class="text-[11px] text-slate-400">Step 1: Pick a Main Category • Step 2: Choose a Sub-Category Prompt &amp; Preview</p>
+              <p class="text-xs text-charcoal-500">Step 1: Pick a Main Category • Step 2: Choose a Sub-Category Prompt &amp; Preview</p>
             </div>
           </div>
 
@@ -273,8 +328,8 @@
               <input
                 type="search"
                 id="promptSearchInput"
-                placeholder="Search 54+ prompts (e.g. audit, API)..."
-                class="w-full pl-3 pr-7 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                placeholder="Search 54+ prompts..."
+                class="w-full pl-3 pr-7 py-2 bg-sand-50 border border-sand-300 rounded-xl text-xs text-charcoal-900 placeholder-charcoal-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 font-mono transition-all"
               />
             </div>
 
@@ -283,7 +338,7 @@
               id="exportPromptsBtn"
               type="button"
               title="Export custom prompts and favorites as JSON"
-              class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-mono transition-colors"
+              class="px-3 py-2 rounded-xl border border-sand-300 bg-white hover:bg-sand-50 text-charcoal-700 text-xs font-mono transition-all active:scale-95 shadow-sm"
             >
               ⇩ Export
             </button>
@@ -291,7 +346,7 @@
               id="importPromptsBtn"
               type="button"
               title="Import custom prompts and favorites from JSON"
-              class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-mono transition-colors"
+              class="px-3 py-2 rounded-xl border border-sand-300 bg-white hover:bg-sand-50 text-charcoal-700 text-xs font-mono transition-all active:scale-95 shadow-sm"
             >
               ⇧ Import
             </button>
@@ -300,7 +355,7 @@
             <button
               id="openCustomPromptModalBtn"
               type="button"
-              class="px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-mono font-semibold transition-colors"
+              class="px-3 py-2 rounded-xl bg-charcoal-900 hover:bg-charcoal-800 text-sand-50 text-xs font-mono font-bold transition-all shadow-sm active:scale-95"
             >
               ＋ New Prompt
             </button>
@@ -308,12 +363,12 @@
         </div>
 
         <!-- STEP 1: Main Category Quick Pills -->
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span class="uppercase tracking-wider font-bold text-slate-300">1. Main Category</span>
-            <span id="activeCategoryCountLabel" class="text-slate-500">8 collections</span>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-[11px] font-mono text-charcoal-500">
+            <span class="uppercase tracking-wider font-bold text-charcoal-700">1. Main Category</span>
+            <span id="activeCategoryCountLabel" class="text-charcoal-400">8 collections</span>
           </div>
-          <div id="promptCategoryPills" class="flex flex-wrap items-center gap-1.5">
+          <div id="promptCategoryPills" class="flex flex-wrap items-center gap-2">
             <!-- Populated dynamically by app.js -->
           </div>
         </div>
@@ -322,12 +377,12 @@
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pt-1">
           <!-- Main Category Select (4 cols) -->
           <div class="md:col-span-4 space-y-1">
-            <label for="promptCategorySelect" class="block text-[11px] font-mono uppercase tracking-wider text-slate-400">
+            <label for="promptCategorySelect" class="block text-[11px] font-mono uppercase tracking-wider text-charcoal-700 font-bold">
               Main Category
             </label>
             <select
               id="promptCategorySelect"
-              class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+              class="w-full bg-sand-50 border border-sand-300 text-charcoal-900 text-xs rounded-2xl px-3.5 py-2.5 font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 cursor-pointer shadow-sm transition-all"
             >
               <!-- Populated dynamically -->
             </select>
@@ -336,15 +391,15 @@
           <!-- Sub-Category / Specific Prompt Select (8 cols) -->
           <div class="md:col-span-8 space-y-1">
             <div class="flex items-center justify-between">
-              <label for="promptPresetSelect" class="block text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              <label for="promptPresetSelect" class="block text-[11px] font-mono uppercase tracking-wider text-charcoal-700 font-bold">
                 2. Sub-Category Prompt Template
               </label>
-              <span id="promptPresetDesc" class="text-[11px] text-indigo-300 font-mono truncate max-w-xs"></span>
+              <span id="promptPresetDesc" class="text-[11px] text-teal-700 font-mono truncate max-w-xs font-semibold"></span>
             </div>
             <div class="flex items-center gap-2">
               <select
                 id="promptPresetSelect"
-                class="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+                class="flex-1 bg-sand-50 border border-sand-300 text-charcoal-900 text-xs rounded-2xl px-3.5 py-2.5 font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 cursor-pointer shadow-sm transition-all"
               >
                 <!-- Populated dynamically based on Main Category -->
               </select>
@@ -353,7 +408,7 @@
                 id="favPromptBtn"
                 type="button"
                 title="Save to Favorites"
-                class="px-2.5 py-2 rounded-xl border border-slate-700 bg-slate-950 hover:border-amber-500/50 text-slate-400 hover:text-amber-400 text-sm transition-colors"
+                class="px-3 py-2.5 rounded-2xl border border-sand-300 bg-white hover:bg-sand-50 text-charcoal-400 hover:text-amber-500 text-sm transition-all shadow-sm active:scale-95"
               >
                 ☆
               </button>
@@ -361,7 +416,7 @@
               <button
                 id="togglePromptPreviewBtn"
                 type="button"
-                class="px-3 py-2 rounded-xl border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-mono font-semibold transition-colors shrink-0"
+                class="px-3.5 py-2.5 rounded-2xl border border-sand-300 bg-white hover:bg-sand-50 text-charcoal-800 text-xs font-mono font-bold transition-all shadow-sm shrink-0 active:scale-95"
               >
                 👁 Preview
               </button>
@@ -370,21 +425,21 @@
         </div>
 
         <!-- STEP 3: Live Prompt Preview & Smart Placeholder Quick-Fill Card -->
-        <div id="promptPreviewPanel" class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div id="promptPreviewPanel" class="bg-sand-50 border border-sand-200 rounded-2xl p-4 space-y-3 shadow-inner">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div class="flex items-center gap-2 flex-wrap">
-              <span id="previewCategoryBadge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span id="previewCategoryBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-teal-50 text-teal-700 border border-teal-200">
                 Prompt Engineering
               </span>
-              <span id="previewKindBadge" class="text-[11px] font-mono text-slate-400">Core framework</span>
+              <span id="previewKindBadge" class="text-[11px] font-mono text-charcoal-500 font-medium">Core framework</span>
               <div id="previewTagsContainer" class="flex items-center gap-1 flex-wrap"></div>
             </div>
 
             <div class="flex items-center gap-2">
-              <label class="text-[11px] font-mono text-slate-400">Placement:</label>
+              <label class="text-[11px] font-mono text-charcoal-500 font-semibold">Placement:</label>
               <select
                 id="promptPlacementMode"
-                class="bg-slate-900 border border-slate-700 text-slate-200 text-[11px] rounded-lg px-2 py-1 font-mono focus:outline-none focus:border-blue-500"
+                class="bg-white border border-sand-300 text-charcoal-900 text-[11px] rounded-xl px-2.5 py-1.5 font-mono focus:outline-none focus:ring-2 focus:ring-charcoal-900 cursor-pointer shadow-sm"
               >
                 <option value="split">Smart Split (Framework → Prefix, Task → Suffix)</option>
                 <option value="prefix">Full Prompt in Prefix Only</option>
@@ -393,73 +448,73 @@
             </div>
           </div>
 
-          <p id="previewFullDesc" class="text-xs text-slate-300 leading-relaxed"></p>
+          <p id="previewFullDesc" class="text-xs text-charcoal-700 leading-relaxed"></p>
 
           <!-- Dynamic Bracketed Placeholders Form (Auto-shown when prompt has [PLACEHOLDERS]) -->
-          <div id="placeholderVariablesBox" class="hidden pt-2 border-t border-slate-800/80 space-y-2">
+          <div id="placeholderVariablesBox" class="hidden pt-3 border-t border-sand-200 space-y-2">
             <div class="flex items-center justify-between flex-wrap gap-2">
-              <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+              <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-teal-700">
                 ⚡ Quick-Fill Prompt Variables (Auto-updates Prefix &amp; Suffix)
               </span>
               <div class="flex items-center gap-3">
-                <button id="autoFillVariablesBtn" type="button" class="text-[11px] font-mono text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1">
+                <button id="autoFillVariablesBtn" type="button" class="text-[11px] font-mono text-teal-600 hover:text-teal-700 font-bold underline flex items-center gap-1">
                   ⚡ Auto-Fill from Scanned Repo
                 </button>
-                <button id="resetPlaceholdersBtn" type="button" class="text-[11px] font-mono text-slate-400 hover:text-white underline">
+                <button id="resetPlaceholdersBtn" type="button" class="text-[11px] font-mono text-charcoal-500 hover:text-charcoal-800 underline">
                   Reset Variables
                 </button>
               </div>
             </div>
-            <div id="placeholderInputsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            <div id="placeholderInputsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <!-- Populated dynamically for each [PLACEHOLDER] -->
             </div>
           </div>
 
           <!-- Raw Prompt Collapsible Code Preview -->
-          <div id="rawPromptPreviewWrap" class="hidden pt-2 border-t border-slate-800/80 space-y-1.5">
-            <div class="flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <span>TEMPLATE PREVIEW (READ-ONLY)</span>
-              <button id="copyRawPromptBtn" type="button" class="text-blue-400 hover:underline">Copy Raw Template</button>
+          <div id="rawPromptPreviewWrap" class="hidden pt-3 border-t border-sand-200 space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] font-mono text-charcoal-500">
+              <span class="font-semibold">TEMPLATE PREVIEW (READ-ONLY)</span>
+              <button id="copyRawPromptBtn" type="button" class="text-teal-600 hover:text-teal-700 font-bold hover:underline">Copy Raw Template</button>
             </div>
-            <pre id="rawPromptPreviewText" class="max-h-56 overflow-y-auto terminal-scroll p-3 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed"></pre>
+            <pre id="rawPromptPreviewText" class="max-h-56 overflow-y-auto terminal-scroll p-3.5 rounded-xl bg-charcoal-950 text-charcoal-200 border border-charcoal-800 text-[11px] font-mono whitespace-pre-wrap leading-relaxed"></pre>
           </div>
         </div>
 
         <!-- Editable Output Textareas (Prefix & Suffix) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-          <div class="bg-slate-950/60 border border-slate-800/90 rounded-xl p-3.5 space-y-2">
+          <div class="bg-sand-50 border border-sand-200 rounded-2xl p-4 space-y-2">
             <div class="flex items-center justify-between">
-              <label for="customStart" class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+              <label for="customStart" class="block text-xs font-mono font-bold uppercase tracking-wider text-charcoal-700">
                 User Instructions / System Context (Prefix)
               </label>
-              <span class="text-[10px] font-mono text-slate-500">&lt;user_instructions&gt;</span>
+              <span class="text-[10px] font-mono text-charcoal-400">&lt;user_instructions&gt;</span>
             </div>
-            <textarea id="customStart" rows="6" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y"></textarea>
+            <textarea id="customStart" rows="6" class="w-full bg-white border border-sand-300 rounded-xl p-3 text-xs text-charcoal-900 placeholder-charcoal-400 focus:outline-none focus:ring-2 focus:ring-charcoal-900 font-mono leading-relaxed resize-y shadow-sm"></textarea>
           </div>
 
-          <div class="bg-slate-950/60 border border-slate-800/90 rounded-xl p-3.5 space-y-2">
+          <div class="bg-sand-50 border border-sand-200 rounded-2xl p-4 space-y-2">
             <div class="flex items-center justify-between">
-              <label for="customEnd" class="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+              <label for="customEnd" class="block text-xs font-mono font-bold uppercase tracking-wider text-charcoal-700">
                 Specific Task / Goal (Suffix)
               </label>
-              <span class="text-[10px] font-mono text-slate-500">&lt;user_prompt&gt;</span>
+              <span class="text-[10px] font-mono text-charcoal-400">&lt;user_prompt&gt;</span>
             </div>
-            <textarea id="customEnd" rows="6" placeholder="e.g. Based on the code above, help me implement..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono leading-relaxed resize-y"></textarea>
+            <textarea id="customEnd" rows="6" placeholder="e.g. Based on the code above, help me implement..." class="w-full bg-white border border-sand-300 rounded-xl p-3 text-xs text-charcoal-900 placeholder-charcoal-400 focus:outline-none focus:ring-2 focus:ring-charcoal-900 font-mono leading-relaxed resize-y shadow-sm"></textarea>
           </div>
         </div>
       </div>
 
       <!-- Action Buttons Bar -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <button id="generateBtn" type="button" class="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="bg-white border border-sand-200 rounded-[26px] p-5 shadow-soft-card flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <button id="generateBtn" type="button" class="w-full sm:w-auto px-7 py-3.5 bg-charcoal-900 hover:bg-charcoal-800 text-sand-50 font-extrabold text-sm rounded-2xl shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-[0.98]">
+            <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Download Context File
           </button>
 
-          <button id="copyBtn" type="button" class="w-full sm:w-auto px-4 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-colors">
+          <button id="copyBtn" type="button" class="w-full sm:w-auto px-6 py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
@@ -468,8 +523,8 @@
         </div>
 
         <div class="w-full sm:w-auto flex justify-end">
-          <button id="telegramBtn" type="button" class="w-full sm:w-auto px-4 py-3.5 bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 hover:text-sky-300 font-semibold text-xs rounded-xl border border-sky-500/30 flex items-center justify-center gap-2 transition-colors">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+          <button id="telegramBtn" type="button" class="w-full sm:w-auto px-5 py-3.5 bg-sand-50 hover:bg-sand-100 text-charcoal-700 hover:text-charcoal-900 font-semibold text-xs rounded-2xl border border-sand-300 shadow-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+            <svg class="w-4 h-4 text-sky-500" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.12.03-2.02 1.28-5.71 3.77-.54.37-1.03.55-1.47.54-.48-.01-1.4-.27-2.09-.49-.84-.27-1.52-.42-1.46-.88.03-.24.38-.49 1.03-.75 4.05-1.76 6.75-2.92 8.1-3.48 3.85-1.6 4.65-1.88 5.17-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.02.07-.02.19-.04.33z" />
             </svg>
             Relay to Telegram Backup
@@ -480,40 +535,40 @@
   </main>
 
   <!-- Code Preview Modal -->
-  <div id="previewModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+  <div id="previewModal" class="hidden fixed inset-0 z-50 bg-charcoal-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white border border-sand-200 rounded-[32px] max-w-4xl w-full max-h-[85vh] flex flex-col shadow-modal-sheet overflow-hidden">
+      <div class="px-6 py-4 bg-sand-50 border-b border-sand-200 flex items-center justify-between">
         <div class="flex items-center gap-3 min-w-0">
-          <span id="previewTitle" class="font-mono text-sm font-semibold text-slate-200 truncate">preview.js</span>
-          <span id="previewModeBadge" class="px-2 py-0.5 rounded text-xs font-mono font-bold uppercase bg-blue-600 text-white">FULL</span>
+          <span id="previewTitle" class="font-mono text-sm font-bold text-charcoal-900 truncate">preview.js</span>
+          <span id="previewModeBadge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold uppercase bg-charcoal-900 text-sand-50">FULL</span>
         </div>
-        <button id="closePreviewBtn" type="button" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+        <button id="closePreviewBtn" type="button" class="text-charcoal-400 hover:text-charcoal-900 p-1.5 rounded-xl hover:bg-sand-200 transition-colors" aria-label="Close Preview Modal">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
-      <div class="p-4 flex-1 overflow-y-auto terminal-scroll bg-slate-950">
-        <pre id="previewCode" class="font-code text-xs text-slate-300 whitespace-pre leading-relaxed"></pre>
+      <div class="p-4 flex-1 overflow-y-auto terminal-scroll bg-charcoal-950">
+        <pre id="previewCode" class="font-mono text-xs text-charcoal-200 whitespace-pre leading-relaxed"></pre>
       </div>
     </div>
   </div>
 
   <!-- Create Custom Prompt Modal -->
-  <div id="customPromptModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full flex flex-col shadow-2xl overflow-hidden">
-      <div class="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-        <span class="font-mono text-sm font-bold text-white">＋ Create Reusable Prompt</span>
-        <button id="closeCustomPromptModalBtn" type="button" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">✕</button>
+  <div id="customPromptModal" class="hidden fixed inset-0 z-50 bg-charcoal-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white border border-sand-200 rounded-[32px] max-w-lg w-full flex flex-col shadow-modal-sheet overflow-hidden">
+      <div class="px-6 py-4 bg-sand-50 border-b border-sand-200 flex items-center justify-between">
+        <span class="font-mono text-sm font-bold text-charcoal-900">＋ Create Reusable Prompt</span>
+        <button id="closeCustomPromptModalBtn" type="button" class="text-charcoal-400 hover:text-charcoal-900 p-1.5 rounded-xl hover:bg-sand-200" aria-label="Close Custom Prompt Modal">✕</button>
       </div>
-      <form id="customPromptForm" class="p-5 space-y-3 text-xs">
+      <form id="customPromptForm" class="p-6 space-y-3.5 text-xs">
         <div>
-          <label class="block font-mono text-slate-300 mb-1">Prompt Title</label>
-          <input id="newPromptTitle" type="text" required maxlength="70" placeholder="e.g. ServiceNow CMDB Graph Audit" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+          <label class="block font-mono text-charcoal-700 font-bold mb-1">Prompt Title</label>
+          <input id="newPromptTitle" type="text" required maxlength="70" placeholder="e.g. Architecture Security Review" class="w-full bg-sand-50 border border-sand-300 rounded-xl px-3.5 py-2.5 text-charcoal-900 font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 shadow-sm" />
         </div>
         <div>
-          <label class="block font-mono text-slate-300 mb-1">Main Category</label>
-          <select id="newPromptCategory" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-blue-500">
+          <label class="block font-mono text-charcoal-700 font-bold mb-1">Main Category</label>
+          <select id="newPromptCategory" class="w-full bg-sand-50 border border-sand-300 rounded-xl px-3.5 py-2.5 text-charcoal-900 font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 shadow-sm cursor-pointer">
             <option value="Prompt Engineering">Prompt Engineering</option>
             <option value="Production Safety">Production Safety</option>
             <option value="Planning & Architecture">Planning & Architecture</option>
@@ -525,29 +580,29 @@
           </select>
         </div>
         <div>
-          <label class="block font-mono text-slate-300 mb-1">Short Description</label>
-          <input id="newPromptDesc" type="text" required maxlength="150" placeholder="What does this prompt accomplish?" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+          <label class="block font-mono text-charcoal-700 font-bold mb-1">Short Description</label>
+          <input id="newPromptDesc" type="text" required maxlength="150" placeholder="What does this prompt accomplish?" class="w-full bg-sand-50 border border-sand-300 rounded-xl px-3.5 py-2.5 text-charcoal-900 font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 shadow-sm" />
         </div>
         <div>
-          <label class="block font-mono text-slate-300 mb-1">Prompt Content (Use [PLACEHOLDER] for variables)</label>
-          <textarea id="newPromptBody" rows="6" required placeholder="Write your reusable prompt here..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-slate-200 font-mono focus:outline-none focus:border-blue-500"></textarea>
+          <label class="block font-mono text-charcoal-700 font-bold mb-1">Prompt Content (Use [PLACEHOLDER] for variables)</label>
+          <textarea id="newPromptBody" rows="6" required placeholder="Write your reusable prompt here..." class="w-full bg-sand-50 border border-sand-300 rounded-xl p-3 text-charcoal-900 font-mono focus:outline-none focus:bg-white focus:ring-2 focus:ring-charcoal-900 shadow-sm"></textarea>
         </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" id="cancelCustomPromptBtn" class="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 font-mono">Cancel</button>
-          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono font-bold">Save Prompt</button>
+        <div class="flex justify-end gap-2.5 pt-2">
+          <button type="button" id="cancelCustomPromptBtn" class="px-4 py-2.5 rounded-xl border border-sand-300 bg-sand-50 text-charcoal-700 font-mono hover:bg-sand-100 transition-all active:scale-95">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-charcoal-900 hover:bg-charcoal-800 text-sand-50 font-mono font-bold transition-all shadow-sm active:scale-95">Save Prompt</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Footer -->
-  <footer class="border-t border-slate-800/60 py-6 text-center text-xs text-slate-500">
+  <footer class="border-t border-sand-200/80 py-6 text-center text-xs text-charcoal-500">
     <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div>AICodeDrop v2 • Optimized for Netlify Free Tier</div>
+      <div>AICodeDrop v2.6 • SandSquircle Edition • Optimized for Netlify Free Tier</div>
       <div class="flex items-center gap-4">
         <span>No servers store your code</span>
         <span>•</span>
-        <a href="https://github.com/akbar-shaik/AICodeDrop" target="_blank" rel="noopener noreferrer" class="hover:text-slate-400 underline">Open Source</a>
+        <a href="https://github.com/akbar-shaik/AICodeDrop" target="_blank" rel="noopener noreferrer" class="hover:text-charcoal-800 underline font-semibold">Open Source</a>
       </div>
     </div>
   </footer>
